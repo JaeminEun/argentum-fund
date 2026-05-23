@@ -1,0 +1,75 @@
+project:
+  name: ira_quant_dashboard
+  base_currency: USD
+  output_path: data/processed/current_universe.csv
+
+universe_schema:
+  required_columns:
+    - ticker
+    - universe_name
+    - source_type
+    - strategy_role
+    - account_target
+    - active
+
+  optional_columns:
+    - company_name
+    - asset_type
+    - source_name
+    - target_weight
+    - sector
+    - industry
+    - cusip
+    - cik
+    - date_added
+    - as_of_date
+    - notes
+
+# Can change and add 'universes'
+universes:
+  - universe_name: sp500_value
+    enabled: true
+    source_type: manual
+    source_name: sp500_value_manual
+    input_path: data/manual/sp500_value_manual.csv
+    input_format:
+      delimiter: ";"
+      decimal: ","
+    strategy_role: value
+    account_target: paper
+    default_asset_type: stock
+
+  - universe_name: burry_autopilot
+    enabled: true
+    source_type: manual
+    source_name: burry_autopilot_manual
+    input_path: data/manual/burry_autopilot_manual.csv
+    # My excel set-up is in international format with semicolon-seperated values and comma as the decimal
+    # For US users, these formats can be adjusted accordingly 
+    input_format:
+      delimiter: ";"
+      decimal: ","
+    strategy_role: value_contrarian
+    account_target: rollover_ira
+    default_asset_type: stock
+
+  - universe_name: simons_autopilot
+    enabled: false
+    source_type: manual
+    source_name: simons_autopilot_manual
+    input_path: data/manual/simons_autopilot_manual.csv
+    strategy_role: aggressive_growth
+    account_target: roth_ira
+    default_asset_type: stock
+
+  - universe_name: burry_13f_future
+    enabled: false
+    source_type: sec_13f
+    source_name: scion_asset_management
+    manager_cik: "0001649339"
+    form_type: "13F-HR"
+    lookback_quarters: 1
+    strategy_role: value_contrarian
+    account_target: paper
+    default_asset_type: stock
+

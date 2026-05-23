@@ -1,0 +1,15 @@
+Argentum Fund:
+
+| Component    | First implementation                                     |
+| ------------ | -------------------------------------------------------- |
+| Universe     | Manual CSV of S&P 500 Value + Autopilot holdings         |
+| Prices       | Daily/weekly price history                               |
+| Fundamentals | P/E, P/B, P/S, dividend yield, FCF yield                 |
+| Scores       | Value, quality, momentum, risk                           |
+| Buy signal   | Normal / accelerate / hold                               |
+| Output       | Excel report + simple charts                             |
+| GitHub       | Clean modular Python repo with README and example output |
+
+
+
+

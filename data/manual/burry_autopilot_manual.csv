@@ -1,0 +1,11 @@
+ticker;company_name;asset_type;target_weight;sector;industry;cusip;date_added;as_of_date;notes;active
+LULU;LULULEMON ATHLETICA INC.;stock;0,172457143;Textiles & Apparel;Textiles & Apparel;550021109;18/05/2026;23/05/2026;;TRUE
+PFE;PFIZER INC.;stock;0,072214286;Pharmaceuticals;Pharmaceuticals;717081103;18/05/2026;23/05/2026;;TRUE
+FISV;FISERV, INC.;stock;0,081071429;Professional & Commercial Services;Professional & Commercial Services;337738108;18/05/2026;23/05/2026;;TRUE
+PLTD;Direxion:Dly PLTR Br 1X;ETF;0,0781;Financial;Financial;25461A429;18/05/2026;23/05/2026;;TRUE
+HAL;HALLIBURTON COMPANY;stock;0,117971429;Oil & Gas Related Equipment and Services;Oil & Gas Related Equipment and Services;406216101;18/05/2026;23/05/2026;;TRUE
+MOH;MOLINA HEALTHCARE, INC.;stock;0,262057143;Healthcare Providers & Services;Healthcare Providers & Services;60855R100;18/05/2026;23/05/2026;;TRUE
+PYPL;PAYPAL HOLDINGS, INC.;stock;0,064371429;Professional & Commercial Services;Professional & Commercial Services;70450Y103;18/05/2026;23/05/2026;;TRUE
+SLV;IShares:Silver Trust;ETF;0,100857143;Financial;Financial;46428Q109;18/05/2026;23/05/2026;;TRUE
+JD;JD.COM, INC.;stock;0,045514286;Diversified Retail;Diversified Retail;47215P106;18/05/2026;23/05/2026;;TRUE
+CASH_USD;U.S. Dollar Cash;cash;0,005385714;;;;18/05/2026;23/05/2026;;TRUE
