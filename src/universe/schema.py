@@ -81,6 +81,37 @@ def normalize_active(value: object) -> bool:
 
     raise ValueError(f"Could not parse active value: {value}")
 
+def normalize_asset_type(value: object) -> str:
+    """
+    Normalize asset type labels into internal conventions.
+    """
+    if pd.isna(value):
+        return ""
+
+    asset_type = str(value).strip().lower()
+
+    asset_type_map = {
+        "equity": "stock",
+        "common stock": "stock",
+        "common_stock": "stock",
+        "ordinary share": "stock",
+        "ordinary_share": "stock",
+        "etf": "etf",
+        "exchange traded fund": "etf",
+        "exchange_traded_fund": "etf",
+        "fund": "fund",
+        "mutual fund": "fund",
+        "mutual_fund": "fund",
+        "cash": "cash",
+        "cash_equivalent": "cash_equivalent",
+        "strategy": "strategy",
+        "paper_strategy": "paper_strategy",
+        "other security": "other_security",
+        "other_security": "other_security",
+    }
+
+    return asset_type_map.get(asset_type, asset_type)
+
 def parse_weight(value: object) -> float | None:
     """
     Parse portfolio weights into decimal form.
@@ -194,6 +225,7 @@ def standardize_universe_frame(df: pd.DataFrame) -> pd.DataFrame:
     df = ensure_columns(df, STANDARD_COLUMNS)
 
     df["ticker"] = df["ticker"].apply(normalize_ticker)
+    df["asset_type"] = df["asset_type"].apply(normalize_asset_type)
     df["active"] = df["active"].apply(normalize_active)
 
     if "target_weight" in df.columns:

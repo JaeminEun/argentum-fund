@@ -1,0 +1,5 @@
+data/processed/
+data/prices/
+data/outputs/
+data/manual/
+__pycache__/

@@ -11,5 +11,7 @@ Argentum Fund:
 | GitHub       | Clean modular Python repo with README and example output |
 
 
-
-
+Additions:
+   1.
+   2. 23/05/2026
+   3. Failed ticker report to csv or txt (24/05/2026)

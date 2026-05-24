@@ -73,3 +73,18 @@ universes:
     account_target: paper
     default_asset_type: stock
 
+price_history:
+  enabled: true
+  input_universe_path: data/processed/current_universe.csv
+  output_path: data/prices/price_history.csv
+  provider: yfinance
+  start_date: "2020-01-01"
+  end_date: null
+  interval: "1d"
+  auto_adjust: false
+
+  tradable_asset_types:
+    - stock
+    - equity
+    - etf
+    - fund
