@@ -88,3 +88,31 @@ price_history:
     - equity
     - etf
     - fund
+
+price_factors:
+  enabled: true
+  input_price_path: data/prices/price_history.csv
+  output_history_path: data/features/price_factors_history.csv
+  output_latest_path: data/features/latest_price_factors.csv
+  price_column: adjusted_close
+  trading_days_per_year: 252
+
+  return_windows:
+    1w: 5
+    4w: 20
+    13w: 63
+    26w: 126
+    52w: 252
+
+  high_windows:
+    13w: 63
+    52w: 252
+
+  moving_average_windows:
+    - 20
+    - 50
+    - 200
+
+  volatility_windows:
+    - 20
+    - 60
