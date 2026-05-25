@@ -3,6 +3,19 @@ project:
   base_currency: USD
   output_path: data/processed/current_universe.csv
 
+export_settings:
+  standard_csv:
+    delimiter: ","
+    decimal: "."
+    encoding: "utf-8"
+
+  excel_csv:
+    enabled: true
+    delimiter: ";"
+    decimal: ","
+    encoding: "utf-8-sig"
+    suffix: "_excel"
+
 universe_schema:
   required_columns:
     - ticker
@@ -116,3 +129,37 @@ price_factors:
   volatility_windows:
     - 20
     - 60
+
+price_scores:
+  enabled: true
+  input_latest_factors_path: data/features/latest_price_factors.csv
+  input_universe_path: data/processed/current_universe.csv
+  output_scores_path: data/scores/latest_price_scores.csv
+
+  score_weights:
+    dip_score: 0.35
+    trend_score: 0.30
+    momentum_score: 0.20
+    risk_score: 0.15
+
+  risk_adjustment:
+    enabled: true
+    high_volatility_threshold: 0.50
+    severe_volatility_threshold: 0.75
+    high_volatility_penalty: 7.5
+    severe_volatility_penalty: 15.0
+    broken_trend_penalty: 10.0
+    severe_broken_trend_penalty: 20.0
+
+  signal_thresholds:
+    moderate_dip: -0.05
+    deep_dip: -0.10
+    severe_dip: -0.20
+    near_high: -0.03
+    above_200d_ma: 0.00
+    slightly_below_200d_ma: -0.05
+    broken_trend: -0.10
+    positive_13w_return: 0.00
+    strong_13w_return: 0.10
+    high_volatility: 0.50
+    severe_volatility: 0.75
