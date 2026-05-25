@@ -163,3 +163,31 @@ price_scores:
     strong_13w_return: 0.10
     high_volatility: 0.50
     severe_volatility: 0.75
+
+sec_api:
+  base_url: "https://data.sec.gov"
+  company_tickers_url: "https://www.sec.gov/files/company_tickers.json"
+  companyfacts_base_url: "https://data.sec.gov/api/xbrl/companyfacts"
+  user_agent_env: "SEC_USER_AGENT"
+  request_delay_seconds: 0.15
+  max_retries: 3
+  timeout_seconds: 30
+  cache_enabled: true
+  cache_dir: data/sec/cache
+  reference_dir: data/sec/reference
+
+sec_reference:
+  enabled: true
+  company_tickers_output_path: data/sec/reference/company_tickers.csv
+  force_refresh: false
+
+sec_company_facts:
+  enabled: true
+  input_universe_path: data/processed/current_universe.csv
+  input_cik_reference_path: data/sec/reference/company_tickers.csv
+  output_summary_path: data/fundamentals/sec_company_facts_summary.csv
+  facts_cache_dir: data/sec/cache/companyfacts
+  force_refresh: false
+
+  tradable_asset_types:
+    - stock

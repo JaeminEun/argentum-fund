@@ -4,3 +4,9 @@ data/outputs/
 data/manual/
 __pycache__/
 data/features/
+data/scores/
+data/sec/cache/
+data/sec/reference/
+.env
+data/fundamentals/
+data/sec/cache/companyfacts/
