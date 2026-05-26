@@ -291,7 +291,11 @@ sec_fundamental_factors:
 fundamental_scores:
   enabled: true
   input_fundamental_factors_path: data/fundamentals/latest_fundamental_factors.csv
+  input_universe_path: data/processed/current_universe.csv
   output_scores_path: data/scores/latest_fundamental_scores.csv
+
+  scoring_mode: sector_relative
+  min_sector_group_size: 5
 
   score_weights:
     quality_score: 0.45

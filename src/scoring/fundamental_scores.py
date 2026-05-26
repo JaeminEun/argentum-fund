@@ -49,6 +49,117 @@ def load_fundamental_factors(input_path: str | Path) -> pd.DataFrame:
 
     return pd.read_csv(input_path)
 
+def load_current_universe(input_path: str | Path) -> pd.DataFrame:
+    """
+    Load current universe metadata so sector and industry can be used
+    in fundamental scoring.
+    """
+    input_path = Path(input_path)
+
+    if not input_path.exists():
+        raise FileNotFoundError(
+            f"Current universe file not found: {input_path}. "
+            "Run the universe builder first."
+        )
+
+    return pd.read_csv(input_path)
+
+
+def prepare_universe_metadata(universe: pd.DataFrame) -> pd.DataFrame:
+    """
+    Prepare sector metadata for merging into fundamental scores.
+
+    If a ticker appears in multiple universes, keep the first available
+    non-empty sector and industry value.
+    """
+    universe = universe.copy()
+
+    if "ticker" not in universe.columns:
+        raise ValueError("Universe file is missing required column: ticker")
+
+    universe["ticker"] = universe["ticker"].astype(str).str.upper().str.strip()
+
+    metadata_columns = [
+        "ticker",
+        "company_name",
+        "sector",
+        "industry",
+        "universe_name",
+        "strategy_role",
+        "account_target",
+    ]
+
+    available_columns = [
+        column for column in metadata_columns if column in universe.columns
+    ]
+
+    metadata = universe[available_columns].copy()
+
+    placeholder_values = {"", "-", "N/A", "NA", "NONE", "NULL", "NAN", "#FIELD!"}
+
+    for column in available_columns:
+        if column == "ticker":
+            continue
+
+        metadata[column] = metadata[column].astype(str).str.strip()
+        metadata.loc[
+            metadata[column].str.upper().isin(placeholder_values),
+            column,
+        ] = pd.NA
+
+    def first_valid(series: pd.Series) -> object:
+        valid = series.dropna()
+
+        if valid.empty:
+            return pd.NA
+
+        valid = valid.astype(str).str.strip()
+        valid = valid[valid != ""]
+
+        if valid.empty:
+            return pd.NA
+
+        return valid.iloc[0]
+
+    metadata = (
+        metadata.groupby("ticker", as_index=False)
+        .agg({column: first_valid for column in available_columns if column != "ticker"})
+    )
+
+    return metadata
+
+
+def merge_universe_metadata(
+    factors: pd.DataFrame,
+    universe: pd.DataFrame | None,
+) -> pd.DataFrame:
+    """
+    Merge universe metadata into fundamental factors.
+    """
+    factors = factors.copy()
+
+    if universe is None:
+        factors["sector"] = pd.NA
+        factors["industry"] = pd.NA
+        return factors
+
+    factors["ticker"] = factors["ticker"].astype(str).str.upper().str.strip()
+
+    metadata = prepare_universe_metadata(universe)
+
+    merged = factors.merge(
+        metadata,
+        on="ticker",
+        how="left",
+    )
+
+    if "sector" not in merged.columns:
+        merged["sector"] = pd.NA
+
+    if "industry" not in merged.columns:
+        merged["industry"] = pd.NA
+
+    return merged
 
 def validate_fundamental_factors(factors: pd.DataFrame) -> None:
     """
@@ -227,13 +338,72 @@ def percentile_score(
     return ranks * 100
 
 
+def sector_relative_percentile_score(
+    df: pd.DataFrame,
+    metric_name: str,
+    sector_column: str = "sector",
+    higher_is_better: bool = True,
+    min_sector_group_size: int = 5,
+) -> pd.Series:
+    """
+    Calculate percentile scores within sector groups.
+
+    If a sector is missing or has too few valid observations, fall back
+    to global percentile scoring for those rows.
+    """
+    if metric_name not in df.columns:
+        return pd.Series(np.nan, index=df.index)
+
+    numeric = pd.to_numeric(df[metric_name], errors="coerce")
+
+    global_score = percentile_score(
+        numeric,
+        higher_is_better=higher_is_better,
+    )
+
+    if sector_column not in df.columns:
+        return global_score
+
+    result = pd.Series(np.nan, index=df.index)
+
+    sectors = df[sector_column].astype(str).str.strip()
+    invalid_sectors = {"", "-", "N/A", "NA", "NONE", "NULL", "NAN", "#FIELD!", "<NA>"}
+
+    for sector_value, sector_index in sectors.groupby(sectors).groups.items():
+        sector_label = str(sector_value).strip()
+
+        if sector_label.upper() in invalid_sectors:
+            continue
+
+        sector_values = numeric.loc[sector_index]
+        valid_count = sector_values.notna().sum()
+
+        if valid_count < min_sector_group_size:
+            continue
+
+        result.loc[sector_index] = percentile_score(
+            sector_values,
+            higher_is_better=higher_is_better,
+        )
+
+    # Fall back to global score where sector-relative score was not available.
+    result = result.fillna(global_score)
+
+    return result
+
 def build_metric_score(
     factors: pd.DataFrame,
     metric_name: str,
     direction: str,
+    scoring_mode: str = "global",
+    min_sector_group_size: int = 5,
 ) -> pd.Series:
     """
     Build a percentile score for a single metric.
+
+    Supports:
+    - global scoring across the full universe
+    - sector-relative scoring within sector groups
     """
     if metric_name not in factors.columns:
         return pd.Series(np.nan, index=factors.index)
@@ -246,9 +416,28 @@ def build_metric_score(
             "Use 'higher' or 'lower'."
         )
 
-    return percentile_score(
-        factors[metric_name],
-        higher_is_better=(direction == "higher"),
+    higher_is_better = direction == "higher"
+
+    scoring_mode = str(scoring_mode).lower().strip()
+
+    if scoring_mode == "sector_relative":
+        return sector_relative_percentile_score(
+            df=factors,
+            metric_name=metric_name,
+            sector_column="sector",
+            higher_is_better=higher_is_better,
+            min_sector_group_size=min_sector_group_size,
+        )
+
+    if scoring_mode == "global":
+        return percentile_score(
+            factors[metric_name],
+            higher_is_better=higher_is_better,
+        )
+
+    raise ValueError(
+        f"Unsupported scoring_mode: {scoring_mode}. "
+        "Use 'global' or 'sector_relative'."
     )
 
 
@@ -271,6 +460,8 @@ def calculate_component_score(
     factors: pd.DataFrame,
     metric_config: Dict[str, str],
     component_name: str,
+    scoring_mode: str = "global",
+    min_sector_group_size: int = 5,
 ) -> tuple[pd.DataFrame, pd.Series]:
     """
     Calculate a component score from configured metrics.
@@ -289,6 +480,8 @@ def calculate_component_score(
             factors=factors,
             metric_name=metric_name,
             direction=direction,
+            scoring_mode=scoring_mode,
+            min_sector_group_size=min_sector_group_size,
         )
 
         metric_score_columns.append(score_column)
@@ -526,6 +719,7 @@ def add_fundamental_interpretation(scores: pd.DataFrame) -> pd.DataFrame:
 def calculate_fundamental_scores(
     factors: pd.DataFrame,
     score_config: Dict[str, Any],
+    universe: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
     """
     Calculate fundamental scores from SEC-derived fundamental factors.
@@ -534,10 +728,15 @@ def calculate_fundamental_scores(
 
     factors = prepare_fundamental_factors(factors)
 
+    factors = merge_universe_metadata(
+        factors=factors,
+        universe=universe,
+)
+
     factors = apply_sanity_filters(
         factors=factors,
         score_config=score_config,
-    )
+)
 
     weights = score_config.get(
         "score_weights",
@@ -547,6 +746,9 @@ def calculate_fundamental_scores(
             "balance_sheet_score": 0.25,
         },
     )
+
+    scoring_mode = score_config.get("scoring_mode", "global")
+    min_sector_group_size = int(score_config.get("min_sector_group_size", 5))
 
     quality_metrics = score_config.get(
     "quality_metrics",
@@ -578,19 +780,25 @@ def calculate_fundamental_scores(
         factors=factors,
         metric_config=quality_metrics,
         component_name="quality_score",
-    )
+        scoring_mode=scoring_mode,
+        min_sector_group_size=min_sector_group_size,
+)
 
     cash_flow_details, cash_flow_score = calculate_component_score(
         factors=factors,
         metric_config=cash_flow_metrics,
         component_name="cash_flow_score",
-    )
+        scoring_mode=scoring_mode,
+        min_sector_group_size=min_sector_group_size,
+)
 
     balance_sheet_details, balance_sheet_score = calculate_component_score(
         factors=factors,
         metric_config=balance_sheet_metrics,
         component_name="balance_sheet_score",
-    )
+        scoring_mode=scoring_mode,
+        min_sector_group_size=min_sector_group_size,
+)
 
     scores = pd.concat(
         [
@@ -626,6 +834,12 @@ def calculate_fundamental_scores(
     output_columns = [
     "fundamental_rank",
     "ticker",
+    "company_name",
+    "sector",
+    "industry",
+    "universe_name",
+    "strategy_role",
+    "account_target",
     "risk_adjusted_fundamental_score",
     "fundamental_score",
     "fundamental_bucket",
@@ -714,12 +928,19 @@ def build_fundamental_scores(config_path: str | Path) -> pd.DataFrame:
 
     input_path = score_config["input_fundamental_factors_path"]
     output_path = score_config["output_scores_path"]
+    universe_path = score_config.get("input_universe_path")
 
     factors = load_fundamental_factors(input_path)
+
+    universe = None
+
+    if universe_path is not None:
+        universe = load_current_universe(universe_path)
 
     scores = calculate_fundamental_scores(
         factors=factors,
         score_config=score_config,
+        universe=universe,
     )
 
     save_fundamental_scores(
@@ -730,23 +951,24 @@ def build_fundamental_scores(config_path: str | Path) -> pd.DataFrame:
 
     return scores
 
-
 if __name__ == "__main__":
     scores = build_fundamental_scores("config/universe_config.yaml")
 
     print("\nTop fundamental scores:")
     preview_columns = [
-        "fundamental_rank",
-        "ticker",
-        "risk_adjusted_fundamental_score",
-        "fundamental_bucket",
-        "fundamental_signal",
-        "quality_score",
-        "cash_flow_score",
-        "balance_sheet_score",
-        "fundamental_penalty",
-        "fundamental_interpretation",
-    ]
+    "fundamental_rank",
+    "ticker",
+    "sector",
+    "industry",
+    "risk_adjusted_fundamental_score",
+    "fundamental_bucket",
+    "fundamental_signal",
+    "quality_score",
+    "cash_flow_score",
+    "balance_sheet_score",
+    "fundamental_penalty",
+    "fundamental_interpretation",
+]
 
     available_preview_columns = [
         column for column in preview_columns if column in scores.columns
