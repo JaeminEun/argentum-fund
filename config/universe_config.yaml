@@ -204,6 +204,24 @@ sec_accounting_concepts:
     - 20-F
     - 40-F
 
+  annual_forms:
+    - 10-K
+    - 20-F
+    - 40-F
+
+  quarterly_forms:
+    - 10-Q
+
+  metric_period_types:
+    revenue: duration_annual
+    net_income: duration_annual
+    operating_income: duration_annual
+    operating_cash_flow: duration_annual
+    capex: duration_annual
+    assets: instant_latest
+    liabilities: instant_latest
+    stockholders_equity: instant_latest
+
   concepts:
     revenue:
       taxonomy: us-gaap
@@ -250,7 +268,6 @@ sec_accounting_concepts:
       candidates:
         - PaymentsToAcquirePropertyPlantAndEquipment
         - PaymentsToAcquireProductiveAssets
-
 sec_fundamental_factors:
   enabled: true
   input_accounting_concepts_path: data/fundamentals/sec_accounting_concepts.csv
