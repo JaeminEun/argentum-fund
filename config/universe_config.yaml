@@ -191,3 +191,112 @@ sec_company_facts:
 
   tradable_asset_types:
     - stock
+
+sec_accounting_concepts:
+  enabled: true
+  input_company_facts_summary_path: data/fundamentals/sec_company_facts_summary.csv
+  facts_cache_dir: data/sec/cache/companyfacts
+  output_path: data/fundamentals/sec_accounting_concepts.csv
+
+  preferred_forms:
+    - 10-K
+    - 10-Q
+    - 20-F
+    - 40-F
+
+  concepts:
+    revenue:
+      taxonomy: us-gaap
+      candidates:
+        - Revenues
+        - RevenueFromContractWithCustomerExcludingAssessedTax
+        - SalesRevenueNet
+
+    net_income:
+      taxonomy: us-gaap
+      candidates:
+        - NetIncomeLoss
+        - ProfitLoss
+
+    assets:
+      taxonomy: us-gaap
+      candidates:
+        - Assets
+
+    liabilities:
+      taxonomy: us-gaap
+      candidates:
+        - Liabilities
+
+    stockholders_equity:
+      taxonomy: us-gaap
+      candidates:
+        - StockholdersEquity
+        - StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest
+
+    operating_income:
+      taxonomy: us-gaap
+      candidates:
+        - OperatingIncomeLoss
+
+    operating_cash_flow:
+      taxonomy: us-gaap
+      candidates:
+        - NetCashProvidedByUsedInOperatingActivities
+        - NetCashProvidedByUsedInOperatingActivitiesContinuingOperations
+
+    capex:
+      taxonomy: us-gaap
+      candidates:
+        - PaymentsToAcquirePropertyPlantAndEquipment
+        - PaymentsToAcquireProductiveAssets
+
+sec_fundamental_factors:
+  enabled: true
+  input_accounting_concepts_path: data/fundamentals/sec_accounting_concepts.csv
+  output_path: data/fundamentals/latest_fundamental_factors.csv
+
+  required_metrics:
+    - revenue
+    - net_income
+    - assets
+    - stockholders_equity
+    - operating_cash_flow
+    - capex
+
+  optional_metrics:
+    - liabilities
+    - operating_income
+
+  min_required_metrics_present: 4
+
+fundamental_scores:
+  enabled: true
+  input_fundamental_factors_path: data/fundamentals/latest_fundamental_factors.csv
+  output_scores_path: data/scores/latest_fundamental_scores.csv
+
+  score_weights:
+    quality_score: 0.45
+    cash_flow_score: 0.30
+    balance_sheet_score: 0.25
+
+  quality_metrics:
+    return_on_equity: higher
+    net_margin: higher
+    operating_margin: higher
+    asset_turnover: higher
+
+  cash_flow_metrics:
+    fcf_margin: higher
+    operating_cash_flow_to_net_income: higher
+
+  balance_sheet_metrics:
+    liabilities_to_assets: lower
+    equity_to_assets: higher
+
+  penalty_settings:
+    negative_net_income_penalty: 15.0
+    negative_free_cash_flow_penalty: 12.5
+    high_liabilities_penalty: 10.0
+    negative_equity_penalty: 25.0
+    limited_data_penalty: 10.0
