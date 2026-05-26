@@ -268,6 +268,7 @@ sec_accounting_concepts:
       candidates:
         - PaymentsToAcquirePropertyPlantAndEquipment
         - PaymentsToAcquireProductiveAssets
+
 sec_fundamental_factors:
   enabled: true
   input_accounting_concepts_path: data/fundamentals/sec_accounting_concepts.csv
@@ -298,18 +299,47 @@ fundamental_scores:
     balance_sheet_score: 0.25
 
   quality_metrics:
-    return_on_equity: higher
-    net_margin: higher
-    operating_margin: higher
-    asset_turnover: higher
+    return_on_equity_scoring: higher
+    net_margin_scoring: higher
+    operating_margin_scoring: higher
+    asset_turnover_scoring: higher
 
   cash_flow_metrics:
-    fcf_margin: higher
-    operating_cash_flow_to_net_income: higher
+    fcf_margin_scoring: higher
+    operating_cash_flow_to_net_income_scoring: higher
 
   balance_sheet_metrics:
-    liabilities_to_assets: lower
-    equity_to_assets: higher
+    liabilities_to_assets_scoring: lower
+    equity_to_assets_scoring: higher
+
+  sanity_filters:
+    enabled: true
+
+    clipping_bounds:
+      return_on_equity:
+        lower: -2.0
+        upper: 2.0
+      net_margin:
+        lower: -1.0
+        upper: 1.0
+      operating_margin:
+        lower: -1.0
+        upper: 1.0
+      fcf_margin:
+        lower: -1.0
+        upper: 1.0
+      asset_turnover:
+        lower: 0.0
+        upper: 5.0
+      liabilities_to_assets:
+        lower: 0.0
+        upper: 2.0
+      equity_to_assets:
+        lower: -1.0
+        upper: 2.0
+      operating_cash_flow_to_net_income:
+        lower: -5.0
+        upper: 5.0
 
   penalty_settings:
     negative_net_income_penalty: 15.0
@@ -317,3 +347,4 @@ fundamental_scores:
     high_liabilities_penalty: 10.0
     negative_equity_penalty: 25.0
     limited_data_penalty: 10.0
+    sanity_filter_penalty: 5.0

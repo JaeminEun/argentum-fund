@@ -116,6 +116,94 @@ def prepare_fundamental_factors(factors: pd.DataFrame) -> pd.DataFrame:
 
     return factors
 
+def apply_sanity_filters(
+    factors: pd.DataFrame,
+    score_config: Dict[str, Any],
+) -> pd.DataFrame:
+    """
+    Create scoring-safe versions of fundamental ratios.
+
+    Raw accounting ratios are preserved. New columns ending in '_scoring'
+    are clipped to configured bounds so extreme outliers do not dominate
+    percentile scoring.
+    """
+    factors = factors.copy()
+
+    sanity_config = score_config.get("sanity_filters", {})
+
+    if not sanity_config.get("enabled", True):
+        return factors
+
+    clipping_bounds = sanity_config.get("clipping_bounds", {})
+
+    factors["sanity_filter_flag"] = False
+    factors["sanity_filter_notes"] = ""
+
+    for metric_name, bounds in clipping_bounds.items():
+        if metric_name not in factors.columns:
+            continue
+
+        lower = bounds.get("lower")
+        upper = bounds.get("upper")
+
+        raw = pd.to_numeric(factors[metric_name], errors="coerce")
+
+        scoring_column = f"{metric_name}_scoring"
+
+        clipped = raw.copy()
+
+        if lower is not None:
+            clipped = clipped.clip(lower=float(lower))
+
+        if upper is not None:
+            clipped = clipped.clip(upper=float(upper))
+
+        changed = raw.notna() & clipped.notna() & (raw != clipped)
+
+        factors[scoring_column] = clipped
+
+        factors.loc[changed, "sanity_filter_flag"] = True
+
+        note = f"{metric_name} clipped"
+
+        factors.loc[changed, "sanity_filter_notes"] = (
+            factors.loc[changed, "sanity_filter_notes"]
+            .astype(str)
+            .replace("nan", "")
+            + note
+            + "; "
+        )
+
+    # If a metric was not configured for clipping, still create a scoring alias
+    # for commonly used scoring metrics.
+    default_scoring_metrics = [
+        "return_on_equity",
+        "net_margin",
+        "operating_margin",
+        "fcf_margin",
+        "asset_turnover",
+        "liabilities_to_assets",
+        "equity_to_assets",
+        "operating_cash_flow_to_net_income",
+    ]
+
+    for metric_name in default_scoring_metrics:
+        scoring_column = f"{metric_name}_scoring"
+
+        if metric_name in factors.columns and scoring_column not in factors.columns:
+            factors[scoring_column] = pd.to_numeric(
+                factors[metric_name],
+                errors="coerce",
+            )
+
+    factors["sanity_filter_notes"] = (
+        factors["sanity_filter_notes"]
+        .astype(str)
+        .str.strip()
+        .str.rstrip(";")
+    )
+
+    return factors
 
 def percentile_score(
     series: pd.Series,
@@ -274,6 +362,9 @@ def apply_fundamental_penalties(
     limited_data_penalty = float(
         penalty_settings.get("limited_data_penalty", 10.0)
     )
+    sanity_filter_penalty = float(
+    penalty_settings.get("sanity_filter_penalty", 5.0)
+)
 
     scores["fundamental_penalty"] = 0.0
 
@@ -301,6 +392,12 @@ def apply_fundamental_penalties(
         scores["fundamental_data_status"].astype(str).str.lower() == "limited",
         "fundamental_penalty",
     ] += limited_data_penalty
+
+    if "sanity_filter_flag" in scores.columns:
+        scores.loc[
+            scores["sanity_filter_flag"] == True,
+            "fundamental_penalty",
+        ] += sanity_filter_penalty
 
     scores["risk_adjusted_fundamental_score"] = (
         scores["fundamental_score"] - scores["fundamental_penalty"]
@@ -407,13 +504,19 @@ def add_fundamental_interpretation(scores: pd.DataFrame) -> pd.DataFrame:
         return f"{value * 100:.1f}%"
 
     def interpret_row(row: pd.Series) -> str:
+        warning = ""
+
+        if row.get("sanity_filter_flag") == True:
+            warning = " Sanity filter applied."
+
         return (
             f"{row['fundamental_signal']}: "
             f"ROE {pct(row.get('return_on_equity'))}, "
             f"net margin {pct(row.get('net_margin'))}, "
             f"FCF margin {pct(row.get('fcf_margin'))}, "
             f"liabilities/assets {pct(row.get('liabilities_to_assets'))}."
-        )
+             f"{warning}"
+)
 
     scores["fundamental_interpretation"] = scores.apply(interpret_row, axis=1)
 
@@ -431,6 +534,11 @@ def calculate_fundamental_scores(
 
     factors = prepare_fundamental_factors(factors)
 
+    factors = apply_sanity_filters(
+        factors=factors,
+        score_config=score_config,
+    )
+
     weights = score_config.get(
         "score_weights",
         {
@@ -441,30 +549,30 @@ def calculate_fundamental_scores(
     )
 
     quality_metrics = score_config.get(
-        "quality_metrics",
-        {
-            "return_on_equity": "higher",
-            "net_margin": "higher",
-            "operating_margin": "higher",
-            "asset_turnover": "higher",
-        },
-    )
+    "quality_metrics",
+    {
+        "return_on_equity_scoring": "higher",
+        "net_margin_scoring": "higher",
+        "operating_margin_scoring": "higher",
+        "asset_turnover_scoring": "higher",
+    },
+)
 
     cash_flow_metrics = score_config.get(
-        "cash_flow_metrics",
-        {
-            "fcf_margin": "higher",
-            "operating_cash_flow_to_net_income": "higher",
-        },
-    )
+    "cash_flow_metrics",
+    {
+        "fcf_margin_scoring": "higher",
+        "operating_cash_flow_to_net_income_scoring": "higher",
+    },
+)
 
     balance_sheet_metrics = score_config.get(
-        "balance_sheet_metrics",
-        {
-            "liabilities_to_assets": "lower",
-            "equity_to_assets": "higher",
-        },
-    )
+    "balance_sheet_metrics",
+    {
+        "liabilities_to_assets_scoring": "lower",
+        "equity_to_assets_scoring": "higher",
+    },
+)
 
     quality_details, quality_score = calculate_component_score(
         factors=factors,
@@ -516,43 +624,56 @@ def calculate_fundamental_scores(
     scores = add_fundamental_interpretation(scores)
 
     output_columns = [
-        "fundamental_rank",
-        "ticker",
-        "risk_adjusted_fundamental_score",
-        "fundamental_score",
-        "fundamental_bucket",
-        "fundamental_signal",
-        "fundamental_penalty",
-        "quality_score",
-        "cash_flow_score",
-        "balance_sheet_score",
-        "return_on_equity",
-        "net_margin",
-        "operating_margin",
-        "fcf_margin",
-        "asset_turnover",
-        "liabilities_to_assets",
-        "equity_to_assets",
-        "operating_cash_flow_to_net_income",
-        "revenue",
-        "net_income",
-        "operating_income",
-        "operating_cash_flow",
-        "capex",
-        "free_cash_flow",
-        "assets",
-        "liabilities",
-        "stockholders_equity",
-        "fundamental_data_status",
-        "required_metrics_present",
-        "optional_metrics_present",
-        "negative_net_income_flag",
-        "negative_free_cash_flow_flag",
-        "high_liabilities_flag",
-        "negative_equity_flag",
-        "weak_margin_flag",
-        "fundamental_interpretation",
-    ]
+    "fundamental_rank",
+    "ticker",
+    "risk_adjusted_fundamental_score",
+    "fundamental_score",
+    "fundamental_bucket",
+    "fundamental_signal",
+    "fundamental_penalty",
+    "quality_score",
+    "cash_flow_score",
+    "balance_sheet_score",
+
+    "return_on_equity",
+    "return_on_equity_scoring",
+    "net_margin",
+    "net_margin_scoring",
+    "operating_margin",
+    "operating_margin_scoring",
+    "fcf_margin",
+    "fcf_margin_scoring",
+    "asset_turnover",
+    "asset_turnover_scoring",
+    "liabilities_to_assets",
+    "liabilities_to_assets_scoring",
+    "equity_to_assets",
+    "equity_to_assets_scoring",
+    "operating_cash_flow_to_net_income",
+    "operating_cash_flow_to_net_income_scoring",
+
+    "revenue",
+    "net_income",
+    "operating_income",
+    "operating_cash_flow",
+    "capex",
+    "free_cash_flow",
+    "assets",
+    "liabilities",
+    "stockholders_equity",
+
+    "fundamental_data_status",
+    "required_metrics_present",
+    "optional_metrics_present",
+    "negative_net_income_flag",
+    "negative_free_cash_flow_flag",
+    "high_liabilities_flag",
+    "negative_equity_flag",
+    "weak_margin_flag",
+    "sanity_filter_flag",
+    "sanity_filter_notes",
+    "fundamental_interpretation",
+]
 
     available_output_columns = [
         column for column in output_columns if column in scores.columns
