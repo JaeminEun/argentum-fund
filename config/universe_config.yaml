@@ -352,3 +352,21 @@ fundamental_scores:
     negative_equity_penalty: 25.0
     limited_data_penalty: 10.0
     sanity_filter_penalty: 5.0
+
+composite_scores:
+  enabled: true
+  input_price_scores_path: data/scores/latest_price_scores.csv
+  input_fundamental_scores_path: data/scores/latest_fundamental_scores.csv
+  output_scores_path: data/scores/latest_composite_scores.csv
+
+  score_weights:
+    price_score: 0.60
+    fundamental_score: 0.40
+
+  thresholds:
+    strong_price_score: 65
+    weak_price_score: 40
+    strong_fundamental_score: 65
+    weak_fundamental_score: 40
+    strong_composite_score: 65
+    weak_composite_score: 40
