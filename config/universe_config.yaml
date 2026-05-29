@@ -370,3 +370,53 @@ composite_scores:
     weak_fundamental_score: 40
     strong_composite_score: 65
     weak_composite_score: 40
+
+cash_deployment:
+  enabled: true
+  input_composite_scores_path: data/scores/latest_composite_scores.csv
+  output_deployment_plan_path: data/deployment/latest_deployment_plan.csv
+
+  account: research_portfolio
+  available_cash: 1000.0
+  deployable_cash_this_period: 300.0
+  base_tranche_amount: 100.0
+  max_candidates: 5
+
+  eligible_signals:
+    - aligned_candidate
+    - timing_candidate_fundamentals_neutral
+    - mixed_signal_review_required
+
+  fundamentals_led_signals:
+    - mixed_signal_review_required
+
+  actions:
+    aligned_candidate: normal_tranche
+    timing_candidate_fundamentals_neutral: test_tranche
+    mixed_signal_review_required: test_tranche
+    possible_value_trap: watch_only
+    quality_watchlist_wait_for_timing: watch_only
+    low_priority: watch_only
+    partial_data_review_required: watch_only
+
+  tranche_multipliers:
+    test_tranche: 0.5
+    normal_tranche: 1.0
+    watch_only: 0.0
+    blocked_by_constraint: 0.0
+
+  constraints:
+    min_composite_score: 60.0
+    min_price_score: 45.0
+    min_fundamental_score: 55.0
+    max_single_position_amount: 100.0
+    max_sector_candidates: 2
+    require_complete_data: true
+    block_possible_value_traps: true
+
+  fundamentals_led_rules:
+    enabled: true
+    min_fundamental_score: 65.0
+    min_price_score: 50.0
+    min_composite_score: 60.0
+    max_tranche_multiplier: 0.5

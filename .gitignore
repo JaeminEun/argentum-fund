@@ -10,3 +10,4 @@ data/sec/reference/
 .env
 data/fundamentals/
 data/sec/cache/companyfacts/
+data/deployment/
