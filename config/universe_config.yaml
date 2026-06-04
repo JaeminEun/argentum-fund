@@ -67,10 +67,13 @@ universes:
     default_asset_type: stock
 
   - universe_name: simons_autopilot
-    enabled: false
+    enabled: true
     source_type: manual
     source_name: simons_autopilot_manual
     input_path: data/manual/simons_autopilot_manual.csv
+    input_format:
+      delimiter: ";"
+      decimal: ","
     strategy_role: aggressive_growth
     account_target: roth_ira
     default_asset_type: stock
@@ -420,3 +423,31 @@ cash_deployment:
     min_price_score: 50.0
     min_composite_score: 60.0
     max_tranche_multiplier: 0.5
+
+portfolio_analysis:
+  enabled: true
+  input_holdings_path: data/manual/portfolio_holdings.csv
+  input_price_history_path: data/prices/price_history.csv
+  input_composite_scores_path: data/scores/latest_composite_scores.csv
+  input_current_universe_path: data/processed/current_universe.csv
+
+  output_positions_path: data/portfolio/latest_portfolio_positions.csv
+  output_summary_path: data/portfolio/latest_portfolio_summary.csv
+  output_sector_exposure_path: data/portfolio/latest_sector_exposure.csv
+  output_strategy_exposure_path: data/portfolio/latest_strategy_exposure.csv
+  output_autopilot_lookthrough_path: data/portfolio/latest_autopilot_lookthrough.csv
+
+  synthetic_strategy_tickers:
+    - BURRY_AUTOPILOT
+    - SIMONS_AUTOPILOT
+
+  cash_tickers:
+    - CASH_USD
+
+  autopilot_universes:
+    - burry_autopilot
+    - simons_autopilot
+
+  score_thresholds:
+    strong_composite_score: 65
+    weak_composite_score: 40
