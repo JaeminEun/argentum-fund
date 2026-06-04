@@ -451,3 +451,26 @@ portfolio_analysis:
   score_thresholds:
     strong_composite_score: 65
     weak_composite_score: 40
+
+weekly_report:
+  enabled: true
+
+  input_composite_scores_path: data/scores/latest_composite_scores.csv
+  input_deployment_plan_path: data/deployment/latest_deployment_plan.csv
+  input_portfolio_positions_path: data/portfolio/latest_portfolio_positions.csv
+  input_portfolio_summary_path: data/portfolio/latest_portfolio_summary.csv
+  input_strategy_exposure_path: data/portfolio/latest_strategy_exposure.csv
+  input_sector_exposure_path: data/portfolio/latest_sector_exposure.csv
+  input_autopilot_lookthrough_path: data/portfolio/latest_autopilot_lookthrough.csv
+
+  output_latest_report_path: reports/weekly/latest_weekly_report.md
+  output_dated_report_dir: reports/weekly
+  output_summary_path: data/reports/latest_weekly_report_summary.csv
+
+  top_n_candidates: 15
+  top_n_deployment_actions: 10
+  top_n_holdings: 15
+  top_n_autopilot_holdings: 10
+  top_n_cautions: 10
+
+  include_disclaimer: true
