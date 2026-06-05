@@ -1,6 +1,6 @@
 # Argentum Fund
 <p align="center">
-  <img src="assets/argentum_capital_logo.png" alt="Argentum Fund Logo" width="300">
+  <img src="assets/argentum_capital_logo.png" alt="Argentum Fund Logo" width="700">
 </p>
 
 > **The youngest you're ever going to be is today.**
