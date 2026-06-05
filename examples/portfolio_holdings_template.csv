@@ -1,0 +1,6 @@
+account,ticker,shares,average_cost,current_value_override,strategy,active,notes
+example_brokerage,AAPL,1,190.00,,manual_composite,TRUE,Example equity position
+example_brokerage,VTI,2,250.00,,broad_index,TRUE,Example broad index position
+example_roth_ira,SGOV,5,100.00,,treasury_reserve,TRUE,Example treasury reserve
+example_roth_ira,CASH_USD,500,1,500,cash,TRUE,Example cash balance
+example_roth_ira,SIMONS_AUTOPILOT,1,1000,1025,autopilot_simons,TRUE,Example synthetic strategy sleeve

@@ -1,0 +1,6 @@
+ticker,company_name,asset_type,target_weight,sector,industry,universe_name,source_type,source_name,strategy_role,account_target,active,notes
+AAPL,Apple Inc.,stock,0.10,Technology,Consumer Electronics,example_manual,manual_csv,example,core_watchlist,paper,TRUE,Example stock holding
+MSFT,Microsoft Corporation,stock,0.10,Technology,Software,example_manual,manual_csv,example,core_watchlist,paper,TRUE,Example stock holding
+VTI,Vanguard Total Stock Market ETF,ETF,0.30,Broad Market,Broad Index,example_manual,manual_csv,example,broad_index,paper,TRUE,Example ETF holding
+SGOV,iShares 0-3 Month Treasury Bond ETF,ETF,0.20,Treasury,Short-Term Treasury,example_manual,manual_csv,example,cash_reserve,paper,TRUE,Example treasury reserve
+CASH_USD,Cash,cash,0.30,Cash,Cash,example_manual,manual_csv,example,cash,paper,TRUE,Example cash allocation

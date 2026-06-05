@@ -1,0 +1,56 @@
+manual_universes:
+  - universe_name: example_manual
+    enabled: true
+    source_type: manual_csv
+    path: examples/manual_universe_template.csv
+    delimiter: ","
+    decimal: "."
+    account_target: paper
+
+export:
+  enabled: true
+  excel_friendly_csv: true
+  excel_delimiter: ";"
+  excel_decimal: ","
+
+sec_api:
+  base_url: "https://data.sec.gov"
+  company_tickers_url: "https://www.sec.gov/files/company_tickers.json"
+  companyfacts_base_url: "https://data.sec.gov/api/xbrl/companyfacts"
+  user_agent_env: "SEC_USER_AGENT"
+  request_delay_seconds: 0.15
+  max_retries: 3
+  timeout_seconds: 30
+  cache_enabled: true
+  cache_dir: data/sec/cache
+  reference_dir: data/sec/reference
+
+portfolio_analysis:
+  enabled: true
+  input_holdings_path: examples/portfolio_holdings_template.csv
+  holdings_delimiter: ","
+  holdings_decimal: "."
+  input_price_history_path: data/prices/price_history.csv
+  input_composite_scores_path: data/scores/latest_composite_scores.csv
+  input_current_universe_path: data/processed/current_universe.csv
+
+  output_positions_path: data/portfolio/latest_portfolio_positions.csv
+  output_summary_path: data/portfolio/latest_portfolio_summary.csv
+  output_sector_exposure_path: data/portfolio/latest_sector_exposure.csv
+  output_strategy_exposure_path: data/portfolio/latest_strategy_exposure.csv
+  output_autopilot_lookthrough_path: data/portfolio/latest_autopilot_lookthrough.csv
+
+  synthetic_strategy_tickers:
+    - SIMONS_AUTOPILOT
+    - BURRY_AUTOPILOT
+
+  cash_tickers:
+    - CASH_USD
+
+  autopilot_universes:
+    - simons_autopilot
+    - burry_autopilot
+
+  score_thresholds:
+    strong_composite_score: 65
+    weak_composite_score: 40
