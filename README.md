@@ -1,328 +1,717 @@
 # Argentum Fund
 
-<p align="center">
-  <img src="assets/argentum_capital_logo.png" alt="Argentum Capital Logo" width="700"/>
-</p>
+> **The youngest you're ever going to be is today.**
 
-<p align="center">
-  <b>Argentum Capital</b><br>
-  A Python-based investment research and timing framework focused on building long-term positions at attractive prices.
-</p>
+Argentum Fund is a Python-based investment research project built around a simple idea: it is never too late to begin investing more thoughtfully. People often say they wish they had invested earlier, bought strong companies sooner, or taken advantage of market weakness when they had the chance. This project is designed around a more constructive view: the time available today still matters, and disciplined tools can help turn today's research into better long-term decisions.
 
----
+Argentum Fund is not designed to chase short-term hype or produce automatic buy/sell commands. Its core purpose is to help users identify **when a security may deserve closer research**, using price behavior, SEC-derived fundamentals, portfolio context, and clear weekly reporting.
 
-## Overview
-
-**Argentum Fund** is a personal investment research project built in Python and versioned on GitHub under the **Argentum Capital** label.
-
-The core idea is simple:
-
-> Good investments are not only about *what* you buy. They are also about *when* you buy.
-
-This project is designed to help identify securities that appear attractive on a longer-term basis, while emphasizing **buy timing**, disciplined cash deployment, and structured portfolio building.
-
-Rather than chasing the fastest possible gains, the Argentum Fund is built around a more measured philosophy:
-
-- identify strong longer-term opportunities
-- monitor valuation and price dislocation
-- deploy capital gradually and intelligently
-- build positions at favorable entry points
-
-The current project has two main research avenues:
-
-### 1. Value Universe Analysis
-
-A research workflow focused on value-oriented securities, especially within the **S&P 500 Value** universe. The objective is to identify securities that have declined in price, yet still display attractive underlying metrics such as:
-
-- Price-to-Earnings Ratio (P/E)
-- Price-to-Book Ratio (P/B)
-- Price-to-Sales Ratio (P/S)
-- EV/EBITDA (Enterprise value relative to operating earnings)
-- Dividend Yield
-- Free Cash Flow Yield
-- other quality and valuation indicators over time
-
-### 2. 13F / Autopilot Supplement
-
-A supporting workflow that evaluates holdings derived from:
-
-- 13F-based portfolios
-- copied or mirrored investor portfolios
-- Autopilot tracker holdings
-
-The goal here is not to blindly copy public portfolios, but to evaluate the **best-performing or most compelling securities inside those portfolios** using the same valuation, quality, and timing logic.
+The project began as a way to supplement Autopilot-style investing based on 13F filings. It has since evolved into a broader research engine that can evaluate professional-investor-inspired universes, value-oriented stock pools, manual watchlists, and current portfolio holdings.
 
 ---
 
 ## Project Philosophy
 
-Argentum Fund is not intended to be a high-frequency trading system or a prediction machine.
+Argentum Fund is built around four principles:
 
-It is intended to be a **decision support system** for longer-term investing.
+1. **Timing matters.**  
+   The central thesis of the model is not only *what* to buy, but *when* a security may deserve attention.
 
-The emphasis is on:
+2. **Fundamentals provide context.**  
+   Price behavior can identify attractive setups, but fundamentals help distinguish stronger businesses from weaker or riskier candidates.
 
-- disciplined accumulation
-- timing entries rather than reacting emotionally
-- managing cash deployment during uncertainty
-- comparing value and momentum in a practical way
-- learning through transparent, repeatable analysis
+3. **Research should be disciplined and repeatable.**  
+   A user should be able to run the same pipeline regularly and receive consistent, explainable outputs.
 
-In practical terms, this means the program aims to answer questions such as:
-
-- Which securities currently look attractive?
-- Are they cheap for a good reason or a bad reason?
-- Is now a reasonable time to buy?
-- Should new cash be deployed normally, accelerated, or held?
-- Are there strong candidates inside a copied 13F or Autopilot portfolio?
-- Is portfolio concentration becoming too high?
+4. **The model should explain uncertainty.**  
+   A good research system should not only highlight candidates. It should also flag missing data, weak fundamentals, possible value traps, and manual review items.
 
 ---
 
-## Current Status
+## What Argentum Fund Does
 
-### Implemented
+Argentum Fund currently supports a full MVP research workflow:
 
-- Config-driven universe building
-- Manual CSV universe support
-- Standardized schema for securities and strategy sleeves
-- Support for synthetic internal identifiers such as cash holdings
-- Support for international CSV conventions including comma-decimal formats
-- Standardized `current_universe.csv` output for downstream analysis
+```text
+Universe Builder
+        ↓
+Price History
+        ↓
+Price Factors
+        ↓
+Price Scores
+        ↓
+SEC Fundamentals
+        ↓
+Fundamental Scores
+        ↓
+Composite Scores
+        ↓
+Cash Deployment Plan
+        ↓
+Portfolio Analyzer
+        ↓
+Weekly Research Memo
+```
 
-### In Progress
+At a high level, the model asks:
 
-- Historical price ingestion
-- Value / quality / momentum factor generation
-- Buy-timing signals
-- Cash deployment logic
-- Tracker-specific portfolio analysis
+- Which securities have attractive price timing?
+- Which securities have supportive accounting fundamentals?
+- Which candidates combine price and fundamentals well?
+- Which holdings in my portfolio look strong, weak, or in need of review?
+- Which Autopilot or 13F-inspired holdings actually look attractive under my own model?
+- What should I review in this week's research memo?
 
 ---
 
-## Core Concepts
+## What Argentum Fund Does Not Do
+
+Argentum Fund does **not** provide financial advice, investment advice, or automatic recommendations to buy or sell securities.
+
+It does not currently:
+
+- Place trades
+- Connect to brokerage APIs
+- Guarantee returns
+- Predict future market behavior
+- Replace manual investment judgment
+- Fully model macroeconomic conditions
+- Fully model sector-specific accounting differences
+- Fully calculate valuation ratios such as P/E, P/B, P/S, or FCF yield
+
+Outputs should be treated as a **research queue**, not as investment instructions.
+
+---
+
+## Current MVP Features
 
 ### Universe Builder
 
-The universe builder creates a standardized investment universe from either:
+Builds a standardized research universe from manual CSV files.
 
-- manual CSV inputs
-- future SEC 13F ingestion workflows
+Current supported use cases:
 
-This ensures that all later analysis operates on a consistent structure.
+- S&P 500 Value-style watchlists
+- Manual Autopilot-style holdings
+- Manual 13F-inspired portfolios
+- Paper portfolios
+- Portfolio-specific universes
+- Cash and reserve positions
 
-### Timing First
-
-A major goal of the project is to identify **when to buy**, not only what to buy.
-
-That means the platform is designed to consider:
-
-- drawdowns from recent highs
-- rolling returns
-- valuation changes
-- quality metrics
-- potential recovery signals
-- cash available for deployment
-
-### Research-Oriented Development
-
-This project also serves as a software and research portfolio. It is being developed to improve skills in:
-
-- Python programming
-- modular software design
-- GitHub version control
-- financial data analysis
-- quantitative research workflows
-- eventual machine learning experimentation
+The universe builder standardizes tickers, weights, account targets, asset types, and metadata.
 
 ---
 
-## Planned Features
+### Price History Module
 
-The roadmap is intentionally modular. Future versions may include:
+Downloads historical price data for tradable tickers.
 
-### Short-Term Priorities
+The price history module provides the foundation for:
 
-- price history builder
-- factor engine for valuation, quality, momentum, and risk
-- ranking engine for candidate securities
-- weekly report generation
-- market condition summaries
-- portfolio overlap and concentration analysis
-- paper portfolio support for testing alternative ideas
-
-### Medium-Term Features
-
-- SEC 13F ingestion module
-- Autopilot holding analyzer
-- configurable scoring engine
-- backtesting framework
-- buy-signal calibration
-- performance comparison against benchmarks such as VTI, VOO, or value ETFs
-
-### Longer-Term Possibilities
-
-- sell-discipline module
-- rebalancing rules engine
-- brokerage API integration
-- alert system for buy and sell conditions
-- dashboard or web app interface
-- machine learning or ranking models
-- market regime detection
-- paper trading or simulation environment
+- Return calculations
+- Moving averages
+- Drawdown measures
+- Volatility estimates
+- Dip and trend detection
 
 ---
 
-## Example Long-Term Vision
+### Price Factor Calculator
 
-A mature version of Argentum Fund could eventually support a workflow like this:
+Calculates price-derived features such as:
 
-1. Build or refresh the investment universe
-2. Pull price and fundamental data
-3. Score securities on value, quality, and timing
-4. Compare opportunities within the value universe and 13F-based portfolios
-5. Generate a ranked list of candidates
-6. Recommend whether to buy now, scale in gradually, or wait
-7. Track performance in both live and paper portfolios
-8. Eventually identify not only **when to buy**, but also **when to trim or sell**
+- Recent returns
+- Distance from moving averages
+- Distance from 13-week and 52-week highs
+- Volatility
+- Trend flags
+- Dip flags
+- Momentum flags
+
+This module is central to the project's original thesis: **price behavior helps identify when a security may deserve attention.**
+
+---
+
+### Price Scoring Module
+
+Converts price factors into a timing-oriented score.
+
+The price score asks:
+
+> Does this security currently show an attractive market-behavior setup?
+
+It is not a prediction. It is a structured timing screen.
+
+---
+
+### SEC CIK Mapper
+
+Maps tickers to SEC CIK identifiers.
+
+The SEC primarily identifies companies by CIK rather than ticker. This module allows Argentum Fund to connect tradable securities to SEC company data.
+
+---
+
+### SEC Company Facts Downloader
+
+Downloads SEC company facts from EDGAR's public XBRL company facts API.
+
+This provides official filing-derived accounting data such as:
+
+- Revenue
+- Net income
+- Assets
+- Liabilities
+- Stockholders' equity
+- Operating income
+- Operating cash flow
+- Capital expenditures
+
+The downloader uses local caching to avoid unnecessary repeated requests.
+
+---
+
+### SEC Accounting Concept Extraction
+
+Extracts selected accounting concepts from cached SEC company facts.
+
+The extraction layer includes improved period handling:
+
+- Annual duration metrics for income statement and cash-flow items
+- Latest instant metrics for balance-sheet items
+
+This helps avoid mixing quarterly revenue with annual net income or cash flow.
+
+---
+
+### Fundamental Factor Calculator
+
+Calculates accounting-based fundamental factors such as:
+
+- Free cash flow
+- Return on equity
+- Net margin
+- Operating margin
+- FCF margin
+- Asset turnover
+- Liabilities to assets
+- Equity to assets
+- Operating cash flow to net income
+
+This module currently focuses on accounting strength and financial quality, not market valuation.
+
+---
+
+### Fundamental Scoring Module
+
+Builds sector-relative fundamental scores.
+
+The fundamental score asks:
+
+> Does this company show a supportive accounting profile relative to peers?
+
+It includes:
+
+- Quality score
+- Cash-flow score
+- Balance-sheet score
+- Sanity filters for extreme ratios
+- Penalties for weak or suspicious fundamentals
+- Sector-relative percentile scoring
+
+---
+
+### Composite Scoring Module
+
+Combines price and fundamental scores into a composite research score.
+
+Current default weighting:
+
+```text
+60% price score
+40% fundamental score
+```
+
+This reflects the project's thesis that timing is central, while fundamentals provide context and quality control.
+
+The composite module classifies securities into labels such as:
+
+- `aligned_candidate`
+- `timing_candidate_fundamentals_neutral`
+- `quality_watchlist_wait_for_timing`
+- `possible_value_trap`
+- `mixed_signal_review_required`
+- `low_priority`
+
+The composite score is best interpreted as a **research priority score**, not a buy score.
+
+---
+
+### Cash Deployment Planner
+
+Creates a non-executing cash deployment plan.
+
+The deployment planner suggests possible tranche actions such as:
+
+- `normal_tranche`
+- `test_tranche`
+- `watch_only`
+
+It considers:
+
+- Composite score
+- Price score
+- Fundamental score
+- Candidate signal
+- Period deployment budget
+- Maximum candidates
+- Sector candidate limits
+- Manual review flags
+
+This module does not execute trades.
+
+---
+
+### Portfolio Analyzer
+
+Analyzes current holdings from a manual holdings CSV.
+
+It calculates:
+
+- Market value
+- Cost basis
+- Unrealized gain/loss
+- Unrealized return
+- Portfolio weight
+- Account weight
+- Strategy exposure
+- Sector exposure
+- Holding-level model score
+- Holding review flags
+
+It also supports synthetic strategy sleeves and cash positions.
+
+---
+
+### Autopilot Look-Through
+
+Analyzes individual securities inside Autopilot-style universes.
+
+This is useful because Autopilot may select holdings based on account size, whole-share constraints, fractional-share availability, or implementation rules. Argentum Fund can instead examine the underlying securities directly.
+
+The look-through analysis asks:
+
+> Which holdings inside a professional-investor-inspired universe actually look attractive under Argentum's model?
+
+---
+
+### Weekly Research Memo
+
+Generates a Markdown weekly research memo.
+
+The memo summarizes:
+
+- Top composite research candidates
+- Active deployment suggestions
+- Manual review items
+- Portfolio snapshot
+- Strategy exposure
+- Sector exposure
+- Autopilot look-through
+- Caution items
+
+The report is designed to read like a concise research memo rather than a trading dashboard.
 
 ---
 
 ## Repository Structure
 
-A simplified project structure is expected to look like this:
-
 ```text
-argentum-fund/
-│
-├── README.md
-├── requirements.txt
-├── config/
-│   └── universe_config.yaml
-│
-├── data/
-│   ├── manual/
-│   ├── processed/
-│   └── outputs/
-│
-├── src/
-│   ├── universe/
-│   ├── data/
-│   ├── features/
-│   ├── scoring/
-│   ├── portfolio/
-│   ├── reports/
-│   └── backtest/
-│
-└── tests/
+config/
+    universe_config.yaml
+
+examples/
+    README.md
+    manual_universe_template.csv
+    portfolio_holdings_template.csv
+    universe_config_template.yaml
+
+src/
+    data/
+        price_history.py
+
+    deployment/
+        cash_deployment.py
+
+    features/
+        price_factors.py
+
+    fundamentals/
+        sec_accounting_concepts.py
+        sec_company_facts.py
+        sec_fundamental_factors.py
+
+    pipeline/
+        run_full_pipeline.py
+
+    portfolio/
+        portfolio_analyzer.py
+
+    reports/
+        weekly_report.py
+
+    scoring/
+        price_scores.py
+        fundamental_scores.py
+        composite_scores.py
+
+    sec/
+        cik.py
+        client.py
+
+    universe/
+        build_universe.py
+        config.py
+        loaders.py
+        schema.py
+
+    utils/
+        io.py
 ```
 
 ---
 
-## Legal Disclaimer
+## Setup
 
-**Argentum Fund is a personal software and research project.**
+### 1. Clone the repository
 
-The author is **not a licensed financial advisor, investment adviser, broker, or other regulated financial professional**. Nothing in this repository constitutes:
+```bash
+git clone <your-repo-url>
+cd argentum-fund
+```
 
-- financial advice
-- investment advice
-- tax advice
-- legal advice
-- a solicitation to buy or sell any security
-- an offer to manage money or operate an investment fund
+### 2. Create or activate your Python environment
 
-All content in this repository is provided for **educational, research, and software development purposes only**.
+Example with Conda:
 
-Any investment decisions made using this code, analysis, or output are made **entirely at the user’s own risk**. Markets involve risk, including the possible loss of principal. Past performance does not guarantee future results.
+```bash
+conda create -n argentum python=3.13
+conda activate argentum
+```
 
-No warranties or guarantees are made regarding:
+### 3. Install dependencies
 
-- accuracy
-- completeness
-- reliability
-- timeliness
-- fitness for a particular investment purpose
+```bash
+pip install -r requirements.txt
+```
 
-Users should conduct their own due diligence and, where appropriate, consult a qualified financial professional before making investment decisions.
+### 4. Set SEC User-Agent
 
----
+The SEC data tools require a User-Agent. Do not hardcode your personal email into the repository.
 
-## AI Usage Disclosure
+Set it locally:
 
-This project was developed with the assistance of **generative AI tools**.
+```bash
+export SEC_USER_AGENT="ArgentumFund/0.1 contact: your_email@example.com"
+```
 
-Generative AI was used to assist with:
+To persist this in WSL:
 
-- brainstorming project structure
-- drafting code scaffolding
-- discussing system design
-- refining documentation
-- exploring analytical ideas
-
-All code, documentation, and investment logic should be reviewed critically by the project owner and by any downstream user. AI assistance does **not** imply correctness, financial suitability, or regulatory compliance.
+```bash
+echo 'export SEC_USER_AGENT="ArgentumFund/0.1 contact: your_email@example.com"' >> ~/.bashrc
+source ~/.bashrc
+```
 
 ---
 
-## Branding Note
+## Configuration
 
-**Argentum Fund** is the name of this repository and research project.  
-**Argentum Capital** is the branding identity used in project materials and visuals.
+The main configuration file is:
 
-This branding is informal and conceptual. It does **not** indicate the existence of a registered investment company, fund, adviser, or legal financial entity.
+```text
+config/universe_config.yaml
+```
 
----
+This file controls:
 
-## Why This Project Exists
+- Enabled universes
+- Manual CSV paths
+- CSV delimiter settings
+- SEC API behavior
+- Price data settings
+- Fundamental scoring settings
+- Composite score weights
+- Cash deployment settings
+- Portfolio analysis settings
+- Weekly report paths
 
-This project sits at the intersection of several interests:
+For public or example setup, see:
 
-- long-term investing
-- value-oriented research
-- disciplined portfolio construction
-- software engineering
-- GitHub-based project development
-- quantitative thinking
-- learning by building
-
-At its best, Argentum Fund should become both:
-
-1. a practical investment research tool
-2. a serious public software project that demonstrates technical growth over time
-
----
-
-## Contributing
-
-This is currently a personal project, but feedback, discussion, and constructive ideas are welcome.
+```text
+examples/universe_config_template.yaml
+```
 
 ---
 
-## Future Versions
+## CSV Formatting
 
-Planned releases may gradually expand the project from a universe-building and buy-timing framework into a broader research platform that includes:
+Argentum Fund supports both standard Python-style CSV files and international Excel-style CSV files.
 
-- sell signal logic
-- backtesting
-- portfolio comparison
-- paper trading
-- broker integrations
-- reporting dashboards
-- machine learning experiments
+### Standard Python CSV
 
-The immediate focus, however, remains clear:
+```yaml
+delimiter: ","
+decimal: "."
+```
 
-> build a disciplined framework for identifying attractive securities and improving the timing of long-term buys.
+For portfolio holdings:
+
+```yaml
+holdings_delimiter: ","
+holdings_decimal: "."
+```
+
+### International Excel CSV
+
+```yaml
+delimiter: ";"
+decimal: ","
+```
+
+For portfolio holdings:
+
+```yaml
+holdings_delimiter: ";"
+holdings_decimal: ","
+```
 
 ---
 
-## License
+## Running the Pipeline
 
-License to be added.
+The easiest way to run the project is through the pipeline runner.
+
+### Full Pipeline
+
+Run everything:
+
+```bash
+python -m src.pipeline.run_full_pipeline --mode full
+```
+
+### Scores Only
+
+Rebuild universe, prices, SEC fundamentals, and composite scores:
+
+```bash
+python -m src.pipeline.run_full_pipeline --mode scores
+```
+
+### Market Mode
+
+Rebuild scores and cash deployment plan:
+
+```bash
+python -m src.pipeline.run_full_pipeline --mode market
+```
+
+### Portfolio Mode
+
+Use this when holdings changed but the scoring universe did not:
+
+```bash
+python -m src.pipeline.run_full_pipeline --mode portfolio
+```
+
+This runs:
+
+```text
+cash deployment → portfolio analyzer → weekly report
+```
+
+### Report Only
+
+Regenerate only the weekly memo:
+
+```bash
+python -m src.pipeline.run_full_pipeline --mode report
+```
+
+### SEC/Fundamentals Only
+
+```bash
+python -m src.pipeline.run_full_pipeline --mode sec
+```
 
 ---
 
-## Author
+## Manual Pipeline Order
 
-**Jaemin Eun**  
-GitHub project under the **Argentum Capital** label.
+If you prefer to run modules manually:
+
+```bash
+python -m src.universe.build_universe
+python -m src.data.price_history
+python -m src.features.price_factors
+python -m src.scoring.price_scores
+python -m src.sec.cik
+python -m src.fundamentals.sec_company_facts
+python -m src.fundamentals.sec_accounting_concepts
+python -m src.fundamentals.sec_fundamental_factors
+python -m src.scoring.fundamental_scores
+python -m src.scoring.composite_scores
+python -m src.deployment.cash_deployment
+python -m src.portfolio.portfolio_analyzer
+python -m src.reports.weekly_report
+```
+
+---
+
+## Viewing the Weekly Report
+
+After running the report module, open:
+
+```text
+reports/weekly/latest_weekly_report.md
+```
+
+In VS Code:
+
+- Markdown preview: `Ctrl + Shift + V`
+- Preview to side: `Ctrl + K`, then `V`
+
+Generated reports are private and should not be committed.
+
+---
+
+## Git and Private Files
+
+This project is designed so users can fork the repo without leaking personal financial data.
+
+Do not commit:
+
+- Personal holdings
+- Generated score files
+- Portfolio outputs
+- Deployment plans
+- Weekly reports
+- SEC cache files
+- Environment variables
+- `.env` files
+- `__pycache__`
+- `.pyc` files
+- editor swap files
+
+Private/generated folders should remain ignored:
+
+```text
+data/scores/
+data/portfolio/
+data/deployment/
+data/fundamentals/
+data/sec/cache/
+reports/weekly/
+data/reports/
+```
+
+---
+
+## Development Workflow
+
+Recommended branch workflow:
+
+```bash
+git checkout main
+git pull
+git status
+git checkout -b feature/my-new-feature
+```
+
+After making changes:
+
+```bash
+git status
+git diff --stat
+git add <intended-files>
+git commit -m "Describe the change"
+git push -u origin feature/my-new-feature
+```
+
+Then open a pull request into `main`.
+
+Before merging, check the GitHub **Files changed** tab carefully. A PR should only contain files related to that branch's purpose.
+
+---
+
+## Versioning
+
+Argentum Fund uses early-stage semantic versioning.
+
+Suggested meaning:
+
+```text
+v0.1.0   First MVP
+v0.1.1   MVP cleanup and bug fixes
+v0.2.0   13F universe automation foundation
+v0.3.0   Valuation ratios and market-cap integration
+v0.4.0   Score history and model validation
+v0.5.0   Sector-specific scoring profiles
+v0.6.0   Sell/trim review logic
+v1.0.0   Stable public release
+```
+
+The current MVP should be treated as a working research system, not a stable final product.
+
+---
+
+## Roadmap
+
+### Near-Term Cleanup
+
+- Pipeline runner improvements
+- Template and example files
+- Better README and onboarding
+- Preflight checks
+- Improved report formatting
+- Version display in reports
+- Better warnings for missing or stale data
+
+### Next Major Direction: Universe Automation
+
+The next major development direction is automated universe creation, especially from SEC 13F filings.
+
+Planned capabilities:
+
+- Manager registry
+- 13F filing downloader
+- 13F holdings parser
+- CUSIP-to-ticker mapping
+- Portfolio weight extraction
+- Automatic universe CSV generation
+- 13F-based universe comparison
+
+This will allow Argentum Fund to evaluate professional-investor-inspired universes directly, without depending on Autopilot implementation constraints.
+
+### Model Accuracy Improvements
+
+Future model improvements may include:
+
+- Market cap integration
+- P/E, P/B, P/S, and FCF yield
+- Earnings yield
+- Multi-year fundamental trends
+- TTM accounting metrics
+- Sector-specific scoring profiles
+- Macro regime filters
+- Score history archive
+- Candidate persistence tracking
+- Sell and trim review logic
+
+---
+
+## Disclaimer
+
+Argentum Fund is a research and educational software project. It is not financial advice, investment advice, or a recommendation to buy or sell securities.
+
+The software is intended to support disciplined research, not replace independent judgment. Always review outputs manually before making investment decisions.
