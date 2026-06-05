@@ -427,6 +427,8 @@ cash_deployment:
 portfolio_analysis:
   enabled: true
   input_holdings_path: data/manual/portfolio_holdings.csv
+  holdings_delimiter: ","
+  holdings_decimal: "."
   input_price_history_path: data/prices/price_history.csv
   input_composite_scores_path: data/scores/latest_composite_scores.csv
   input_current_universe_path: data/processed/current_universe.csv
