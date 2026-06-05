@@ -35,16 +35,41 @@ def load_portfolio_analysis_config(config_path: str | Path) -> Dict[str, Any]:
     return config
 
 
-def load_csv(path: str | Path, label: str) -> pd.DataFrame:
+def load_csv(
+    path: str | Path,
+    label: str,
+    delimiter: str = ",",
+    decimal: str = ".",
+) -> pd.DataFrame:
     """
     Load a CSV file with a useful error message.
+
+    Parameters
+    ----------
+    path:
+        CSV file path.
+    label:
+        Human-readable label for error messages.
+    delimiter:
+        Column delimiter. Use "," for standard CSV or ";" for many
+        international Excel exports.
+    decimal:
+        Decimal marker. Use "." for standard CSV or "," for many
+        international Excel exports.
     """
     path = Path(path)
 
     if not path.exists():
         raise FileNotFoundError(f"{label} file not found: {path}")
 
-    return pd.read_csv(path)
+    try:
+        return pd.read_csv(path, sep=delimiter, decimal=decimal)
+    except Exception as error:
+        raise ValueError(
+            f"Failed to read {label} CSV: {path}\n"
+            f"delimiter={delimiter!r}, decimal={decimal!r}\n"
+            f"Original error: {error}"
+        ) from error
 
 
 def validate_holdings(holdings: pd.DataFrame) -> None:
@@ -54,7 +79,11 @@ def validate_holdings(holdings: pd.DataFrame) -> None:
     missing = set(REQUIRED_HOLDINGS_COLUMNS) - set(holdings.columns)
 
     if missing:
-        raise ValueError(f"Portfolio holdings file missing columns: {missing}")
+        raise ValueError(
+            f"Portfolio holdings file missing columns: {missing}. "
+            "If the columns look merged into one column, check "
+            "portfolio_analysis.holdings_delimiter in the YAML config."
+    )
 
     if holdings.empty:
         raise ValueError("Portfolio holdings file is empty.")
@@ -575,7 +604,9 @@ def run_portfolio_analysis(config_path: str | Path) -> dict[str, pd.DataFrame]:
     holdings = load_csv(
         portfolio_config["input_holdings_path"],
         "Portfolio holdings",
-    )
+        delimiter=portfolio_config.get("holdings_delimiter", ","),
+        decimal=portfolio_config.get("holdings_decimal", "."),
+)
 
     price_history = load_csv(
         portfolio_config["input_price_history_path"],
