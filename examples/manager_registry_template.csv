@@ -1,0 +1,5 @@
+manager_id,manager_name,filing_entity_name,cik,cik_padded,strategy_family,enabled,notes
+berkshire_hathaway,Berkshire Hathaway,BERKSHIRE HATHAWAY INC,1067983,0001067983,value_quality,TRUE,Example long-term value and quality manager
+scion_asset_management,Scion Asset Management,SCION ASSET MANAGEMENT LLC,1649339,0001649339,contrarian_value,TRUE,Example contrarian value manager
+renaissance_technologies,Renaissance Technologies,RENAISSANCE TECHNOLOGIES LLC,1037389,0001037389,quant,TRUE,Example quantitative manager
+example_disabled_manager,Example Disabled Manager,EXAMPLE FILING ENTITY,1234567,0001234567,example,FALSE,Disabled example row
