@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from src import __version__
+
 import argparse
 import os
 import subprocess
@@ -255,6 +257,7 @@ def run_pipeline(
 
     print("")
     print("ARGENTUM FUND PIPELINE")
+    print(f"Version: v{__version__}")
     print(f"Mode: {mode}")
     print(f"Config: {config_path}")
     print(f"Steps: {len(steps)}")

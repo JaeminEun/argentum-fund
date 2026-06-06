@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from src import __version__
+
 import argparse
 import os
 import sys
@@ -671,10 +673,13 @@ def print_results(results: list[CheckResult], use_color: bool = True) -> None:
     Print preflight results in a readable, colorful format.
     """
     print_banner(
-        title="ARGENTUM FUND PREFLIGHT CHECKS",
-        subtitle="Validating repo structure, config, inputs, privacy safeguards, and source files.",
-        use_color=use_color,
-    )
+    title="ARGENTUM FUND PREFLIGHT CHECKS",
+    subtitle=(
+        f"Argentum Fund v{__version__} | "
+        "Validating repo structure, config, inputs, privacy safeguards, and source files."
+    ),
+    use_color=use_color,
+)
 
     for result in results:
         icon = STATUS_ICONS.get(result.level, "-")

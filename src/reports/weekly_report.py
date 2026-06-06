@@ -6,6 +6,7 @@ from typing import Any, Dict
 
 import pandas as pd
 
+from src import __version__
 from src.universe.config import load_config
 
 
@@ -78,6 +79,75 @@ def format_percent(value: object) -> str:
     except Exception:
         return str(value)
 
+def format_report_columns(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Format common report columns for cleaner Markdown tables.
+    """
+    df = df.copy()
+
+    currency_columns = [
+        "market_value",
+        "cost_basis",
+        "unrealized_gain",
+        "suggested_amount",
+        "adjusted_close",
+        "latest_price",
+        "period_budget",
+        "cumulative_suggested_amount",
+    ]
+
+    percent_columns = [
+        "portfolio_weight",
+        "account_weight",
+        "unrealized_return",
+        "target_weight",
+        "cash_weight",
+        "below_13w_high",
+        "below_52w_high",
+        "distance_from_ma_200d",
+        "return_13w",
+        "volatility_60d",
+    ]
+
+    score_columns = [
+        "composite_research_score",
+        "price_score",
+        "fundamental_score",
+        "quality_score",
+        "cash_flow_score",
+        "balance_sheet_score",
+        "avg_composite_score",
+        "avg_price_score",
+        "avg_fundamental_score",
+    ]
+
+    rank_columns = [
+        "composite_rank",
+        "price_rank",
+        "fundamental_rank",
+    ]
+
+    for column in currency_columns:
+        if column in df.columns:
+            df[column] = df[column].apply(format_currency)
+
+    for column in percent_columns:
+        if column in df.columns:
+            df[column] = df[column].apply(format_percent)
+
+    for column in score_columns:
+        if column in df.columns:
+            df[column] = df[column].apply(
+                lambda value: format_number(value, decimals=1)
+            )
+
+    for column in rank_columns:
+        if column in df.columns:
+            df[column] = df[column].apply(
+                lambda value: format_number(value, decimals=0)
+            )
+
+    return df
 
 def dataframe_to_markdown_table(
     df: pd.DataFrame,
@@ -100,6 +170,8 @@ def dataframe_to_markdown_table(
 
     if max_rows is not None:
         table = table.head(max_rows)
+
+    table = format_report_columns(table)
 
     if rename_map:
         table = table.rename(columns=rename_map)
@@ -178,7 +250,7 @@ def build_executive_summary(
             "Strategy exposure is summarized below to compare manual composite positions, Autopilot holdings, reserves, and cash."
         )
 
-    return " ".join(lines)
+    return "\n".join(f"- {line}" for line in lines)
 
 
 def build_top_composite_section(composite: pd.DataFrame, top_n: int) -> str:
@@ -580,6 +652,10 @@ def build_report_summary_csv(
             "value": datetime.now().date().isoformat(),
         },
         {
+        "metric": "argentum_version",
+        "value": __version__,
+        },
+        {
             "metric": "composite_rows",
             "value": len(composite),
         },
@@ -677,6 +753,7 @@ def build_weekly_report(config_path: str | Path) -> str:
         f"# Argentum Fund Weekly Research Memo",
         "",
         f"**Report date:** {report_date}",
+        f"**Argentum Fund version:** v{__version__}",
         "",
         "## Executive Summary",
         "",
