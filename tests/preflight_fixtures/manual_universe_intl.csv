@@ -1,0 +1,3 @@
+ticker;company_name;asset_type;target_weight;sector;industry
+AAPL;Apple Inc.;stock;0,10;Technology;Consumer Electronics
+MSFT;Microsoft Corporation;stock;0,10;Technology;Software

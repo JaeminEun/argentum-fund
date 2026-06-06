@@ -1,0 +1,3 @@
+symbol,company_name,asset_type,target_weight
+AAPL,Apple Inc.,stock,0.10
+MSFT,Microsoft Corporation,stock,0.10
