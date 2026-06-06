@@ -1,0 +1,2 @@
+account,ticker,shares,average_cost,strategy,active
+example_brokerage,AAPL,1,190.00,manual_composite,TRUE

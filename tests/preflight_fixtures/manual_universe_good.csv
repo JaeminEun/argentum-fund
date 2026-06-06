@@ -1,0 +1,4 @@
+ticker,company_name,asset_type,target_weight,sector,industry,universe_name,source_type,source_name,strategy_role,account_target,active,notes
+AAPL,Apple Inc.,stock,0.10,Technology,Consumer Electronics,test_good,manual_csv,test,core_watchlist,paper,TRUE,good test row
+MSFT,Microsoft Corporation,stock,0.10,Technology,Software,test_good,manual_csv,test,core_watchlist,paper,TRUE,good test row
+SGOV,iShares 0-3 Month Treasury Bond ETF,ETF,0.20,Treasury,Short-Term Treasury,test_good,manual_csv,test,cash_reserve,paper,TRUE,reserve row
