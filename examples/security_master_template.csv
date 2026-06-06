@@ -1,0 +1,4 @@
+ticker,company_name,cik,cik_padded,asset_type,sector,industry,exchange,currency,source,last_updated,notes
+AAPL,Apple Inc.,320193,0000320193,stock,Technology,Consumer Electronics,NASDAQ,USD,manual,2026-01-01,Example stock
+SGOV,iShares 0-3 Month Treasury Bond ETF,,,ETF,Treasury,Short-Term Treasury,NYSEARCA,USD,manual,2026-01-01,Example treasury ETF
+CASH_USD,Cash,,,cash,Cash,Cash,,USD,manual,2026-01-01,Example cash placeholder
