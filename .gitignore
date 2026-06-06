@@ -14,3 +14,7 @@ data/deployment/
 reports/weekly/
 data/reports/
 data/reference/
+data/13f/raw/
+data/13f/parsed/
+data/13f/universes/
+data/13f/reference/
