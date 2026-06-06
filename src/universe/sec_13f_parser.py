@@ -231,20 +231,18 @@ def parse_info_table_element(element: ET.Element) -> dict[str, Any]:
     """
     Parse one 13F infoTable XML element.
     """
-    value_usd_thousands = parse_numeric(child_text(element, "value"))
+    reported_value = parse_numeric(child_text(element, "value"))
     shares = parse_numeric(nested_child_text(element, "shrsOrPrnAmt", "sshPrnamt"))
 
-    value_usd = (
-        value_usd_thousands * 1000
-        if value_usd_thousands is not None
-        else None
-    )
+    # SEC 13F XML information tables currently provide values that behave like
+    # dollar-level market values in our tested filings. Do not multiply by 1000.
+    value_usd = reported_value
 
     return {
         "issuer_name": child_text(element, "nameOfIssuer"),
         "class_title": child_text(element, "titleOfClass"),
         "cusip": normalize_cusip(child_text(element, "cusip")),
-        "value_usd_thousands": value_usd_thousands,
+        "value_usd_thousands": reported_value,
         "value_usd": value_usd,
         "shares": shares,
         "share_type": nested_child_text(element, "shrsOrPrnAmt", "sshPrnamtType"),
