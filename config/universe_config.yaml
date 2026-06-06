@@ -89,6 +89,19 @@ universes:
     account_target: paper
     default_asset_type: stock
 
+ticker_list_universes:
+  - universe_name: example_ticker_watchlist
+    enabled: false
+    input_path: examples/ticker_list_template.csv
+    output_path: data/manual/example_ticker_watchlist_universe.csv
+    delimiter: ","
+    decimal: "."
+    account_target: paper
+    default_source_name: example_ticker_watchlist
+    default_strategy_role: manual_watchlist
+    default_asset_type: stock
+    weighting_method: equal_weight
+
 price_history:
   enabled: true
   input_universe_path: data/processed/current_universe.csv
@@ -476,3 +489,9 @@ weekly_report:
   top_n_cautions: 10
 
   include_disclaimer: true
+
+security_master:
+  enabled: true
+  path: data/reference/security_master.csv
+  sec_ticker_reference_path: data/sec/reference/company_tickers.csv
+  create_if_missing: true
