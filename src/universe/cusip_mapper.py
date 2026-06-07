@@ -425,12 +425,12 @@ def save_lookup_from_manual_overrides(
     persist for future runs.
     """
     combined = pd.concat(
-        [
-            local_lookup,
-            manual_overrides,
-        ],
-        ignore_index=True,
-    )
+    [
+        manual_overrides,
+        local_lookup,
+    ],
+    ignore_index=True,
+)
 
     combined = standardize_cusip_lookup(combined)
 
