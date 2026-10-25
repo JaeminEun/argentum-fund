@@ -85,7 +85,16 @@ def get_git_state() -> Dict[str, Any]:
         except (subprocess.CalledProcessError, FileNotFoundError):
             return None
 
-    status = run_git("status", "--porcelain", "--", "src", "config")
+    # Only tracked source and config files affect results; compiled
+    # caches and untracked backups do not.
+    status = run_git(
+        "status",
+        "--porcelain",
+        "--untracked-files=no",
+        "--",
+        "src/*.py",
+        "config/*.yaml",
+    )
 
     return {
         "git_commit": run_git("rev-parse", "--short", "HEAD"),
