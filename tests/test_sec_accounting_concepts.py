@@ -397,3 +397,24 @@ def test_ttm_combines_concepts_when_10k_and_10q_use_different_tags():
     assert row["val"] == pytest.approx(643.8 + 138.1 - 148.2)
     assert row["end"] == pd.Timestamp("2026-03-31")
     assert row["concept_name"] == "NetIncomeLoss + ProfitLoss"
+
+
+def test_ttm_leaves_metric_missing_when_only_interim_periods_exist():
+    # New registrant (e.g. a holding company reorganization) with only 10-Qs.
+    selected = extract_accounting_concepts_for_company(
+        facts=make_facts(
+            {
+                "Revenue": [
+                    duration_fact("2026-04-01", "2026-06-30", 116.0, "10-Q", "Q2"),
+                ]
+            }
+        ),
+        ticker="EX",
+        cik_padded="0000000001",
+        concepts_config={"revenue": {"taxonomy": "us-gaap", "candidates": ["Revenue"]}},
+        preferred_forms=["10-K", "10-Q"],
+        annual_forms=["10-K"],
+        metric_period_types={"revenue": "duration_ttm"},
+    )
+
+    assert selected.empty

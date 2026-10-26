@@ -446,6 +446,14 @@ def select_record_for_metric(
             annual_forms=annual_forms,
         )
 
+        # The annual selector falls back to any duration when no full year
+        # exists (e.g. a newly registered holding company with only 10-Qs).
+        # A quarter treated as a year distorts ratios, so leave it missing.
+        if not annual.empty:
+            row = annual.iloc[0]
+            if row["duration_type"] != "annual" and row["fp"] != "FY":
+                annual = annual.iloc[0:0]
+
         # A concept the company stopped using can still form an old TTM, so
         # only prefer TTM when it is more recent than the annual value.
         if not ttm.empty and (
