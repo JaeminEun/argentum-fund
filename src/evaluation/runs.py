@@ -189,6 +189,74 @@ def snapshot_pipeline_outputs(
     return captured
 
 
+def snapshot_universe(run_dir: Path, config_path: str | Path) -> Dict[str, Any]:
+    """
+    Copy the universe the pipeline scored into the run folder.
+
+    Returns per-universe ticker counts and holdings dates for the run
+    metadata, so later comparisons can tell when the universe changed.
+    """
+    universe_path = Path(load_config(config_path)["project"]["output_path"])
+
+    if not universe_path.exists():
+        print(f"  Warning: {universe_path} not found; skipping universe snapshot.")
+        return {}
+
+    outputs_dir = run_dir / "outputs"
+    outputs_dir.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(universe_path, outputs_dir / "universe.csv")
+
+    universe = pd.read_csv(universe_path, dtype=str)
+
+    return {
+        str(name): {
+            "tickers": int(group["ticker"].nunique()),
+            "as_of_date": group["as_of_date"].dropna().max()
+            if "as_of_date" in group.columns
+            else None,
+        }
+        for name, group in universe.groupby("universe_name")
+    }
+
+
+def compare_universes(before_dir: Path, after_dir: Path) -> pd.DataFrame | None:
+    """
+    Per universe, count tickers that entered or left between two runs.
+
+    Score changes between runs on different universes mix model changes
+    with membership changes; this table makes the second part visible.
+    """
+    before = load_run_output(before_dir, "universe")
+    after = load_run_output(after_dir, "universe")
+
+    if before is None or after is None:
+        return None
+
+    records = []
+
+    for name in sorted(set(before["universe_name"]) | set(after["universe_name"])):
+        before_rows = before[before["universe_name"] == name]
+        after_rows = after[after["universe_name"] == name]
+        before_tickers = set(before_rows["ticker"])
+        after_tickers = set(after_rows["ticker"])
+
+        records.append(
+            {
+                "universe_name": name,
+                "as_of_before": before_rows.get("as_of_date", pd.Series()).dropna().max(),
+                "as_of_after": after_rows.get("as_of_date", pd.Series()).dropna().max(),
+                "tickers_before": len(before_tickers),
+                "tickers_after": len(after_tickers),
+                "tickers_added": len(after_tickers - before_tickers),
+                "tickers_removed": len(before_tickers - after_tickers),
+                "added": " ".join(sorted(after_tickers - before_tickers)),
+                "removed": " ".join(sorted(before_tickers - after_tickers)),
+            }
+        )
+
+    return pd.DataFrame(records)
+
+
 def load_run_output(run_dir: Path, name: str) -> pd.DataFrame | None:
     """
     Load a snapshotted output file from a run, if present.
@@ -372,6 +440,24 @@ def compare_runs(
 
     summary = pd.DataFrame(summary_records)
     summary.to_csv(comparison_dir / "output_changes.csv", index=False)
+
+    universe_changes = compare_universes(before_dir, after_dir)
+
+    if universe_changes is None:
+        print("Note: one of the runs has no universe snapshot; membership changes unknown.")
+    else:
+        universe_changes.to_csv(comparison_dir / "universe_changes.csv", index=False)
+        changed = universe_changes[
+            (universe_changes["tickers_added"] > 0)
+            | (universe_changes["tickers_removed"] > 0)
+        ]
+        for row in changed.itertuples():
+            print(
+                f"Universe changed: {row.universe_name} "
+                f"+{row.tickers_added} / -{row.tickers_removed} tickers "
+                f"({row.as_of_before} -> {row.as_of_after}). "
+                "Score changes include membership changes."
+            )
 
     # Side-by-side backtest and data health summaries, when both runs have them.
     for file_name, key_columns in (

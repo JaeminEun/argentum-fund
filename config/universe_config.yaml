@@ -51,6 +51,14 @@ universes:
     strategy_role: value
     account_target: paper
     default_asset_type: stock
+    # Refreshed from State Street's daily SPYV holdings with
+    # `python -m src.universe.etf_holdings --universe sp500_value [--apply]`.
+    # Each refresh is kept as a dated snapshot with a diff.
+    holdings_refresh:
+      provider: ssga
+      url: https://www.ssga.com/library-content/products/fund-data/etfs/us/holdings-daily-us-en-spyv.xlsx
+      snapshot_dir: data/universe_snapshots/sp500_value
+      sector_reference_path: data/reference/security_master.csv
 
   - universe_name: burry_autopilot
     enabled: true

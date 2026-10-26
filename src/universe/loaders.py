@@ -19,7 +19,13 @@ def load_manual_universe(universe_config: Dict[str, Any]) -> pd.DataFrame:
     delimiter = input_format.get("delimiter", ",")
     decimal = input_format.get("decimal", ".")
 
-    df = pd.read_csv(input_path, sep=delimiter, decimal=decimal)
+    # Keep identifiers as text so CUSIPs keep their leading zeros.
+    df = pd.read_csv(
+        input_path,
+        sep=delimiter,
+        decimal=decimal,
+        dtype={"cusip": str, "cik": str},
+    )
 
     df["universe_name"] = universe_config["universe_name"]
     df["source_type"] = universe_config["source_type"]
