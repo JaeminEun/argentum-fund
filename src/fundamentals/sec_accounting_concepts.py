@@ -231,7 +231,17 @@ def extract_candidate_concept_records(
     concept_config: Dict[str, Any],
 ) -> pd.DataFrame:
     """
-    Extract records for the first available candidate concept for a metric.
+    Extract records for a metric from all of its candidate concepts.
+
+    Companies switch concepts over time (for example, many moved from
+    Revenues to RevenueFromContractWithCustomerExcludingAssessedTax around
+    2018), so stopping at the first concept with any data can return values
+    that are years out of date. Records from every candidate are combined so
+    the period selection step can pick the most recent one.
+
+    When several concepts report the same period, only the records from the
+    earliest-listed candidate are kept, so candidate order still sets the
+    preference.
 
     Example:
         metric_name = revenue
@@ -242,7 +252,9 @@ def extract_candidate_concept_records(
 
     entity_name = facts.get("entityName")
 
-    for concept_name in candidates:
+    frames = []
+
+    for priority, concept_name in enumerate(candidates):
         units = get_concept_units(
             facts=facts,
             taxonomy=taxonomy,
@@ -271,9 +283,24 @@ def extract_candidate_concept_records(
                 unit=unit,
             )
 
-            return add_period_classification(normalized)
+            normalized["candidate_priority"] = priority
+            frames.append(normalized)
 
-    return pd.DataFrame()
+    if not frames:
+        return pd.DataFrame()
+
+    records = pd.concat(frames, ignore_index=True)
+
+    # Instant facts have no start date, so keep missing keys as a group.
+    best_priority = records.groupby(
+        ["start", "end"],
+        dropna=False,
+    )["candidate_priority"].transform("min")
+
+    records = records[records["candidate_priority"].eq(best_priority)]
+    records = records.drop(columns="candidate_priority").reset_index(drop=True)
+
+    return add_period_classification(records)
 
 
 def filter_preferred_forms(
