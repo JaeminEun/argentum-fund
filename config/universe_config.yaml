@@ -228,12 +228,15 @@ sec_accounting_concepts:
   quarterly_forms:
     - 10-Q
 
+  # duration_ttm: trailing twelve months from the latest 10-Q when
+  # available, otherwise the latest annual value. duration_annual: latest
+  # fiscal year only.
   metric_period_types:
-    revenue: duration_annual
-    net_income: duration_annual
-    operating_income: duration_annual
-    operating_cash_flow: duration_annual
-    capex: duration_annual
+    revenue: duration_ttm
+    net_income: duration_ttm
+    operating_income: duration_ttm
+    operating_cash_flow: duration_ttm
+    capex: duration_ttm
     assets: instant_latest
     liabilities: instant_latest
     stockholders_equity: instant_latest

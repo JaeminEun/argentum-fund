@@ -435,9 +435,134 @@ def select_record_for_metric(
             annual_forms=annual_forms,
         )
 
+    if period_type == "duration_ttm":
+        ttm = select_latest_ttm_record(
+            records=records,
+            annual_forms=annual_forms,
+        )
+
+        annual = select_latest_annual_duration_record(
+            records=records,
+            annual_forms=annual_forms,
+        )
+
+        # A concept the company stopped using can still form an old TTM, so
+        # only prefer TTM when it is more recent than the annual value.
+        if not ttm.empty and (
+            annual.empty or ttm.iloc[0]["end"] > annual.iloc[0]["end"]
+        ):
+            return ttm
+
+        return annual
+
     raise ValueError(
         f"Unsupported period type '{period_type}' for metric '{metric_name}'."
     )
+
+
+def build_ttm_record_for_concept(
+    records: pd.DataFrame,
+    annual_forms: list[str],
+    date_tolerance_days: int = 7,
+) -> pd.DataFrame:
+    """
+    Build a trailing twelve month record from one concept's records.
+
+    10-Q filings report fiscal year-to-date values (and cash flow statements
+    report only year-to-date), so TTM is computed as:
+
+        latest annual + current year-to-date - prior year-to-date
+
+    The current year-to-date period must start right after the latest annual
+    period ends, and the prior one must cover the same span a year earlier.
+    A small date tolerance absorbs 52/53-week fiscal calendars.
+
+    Returns an empty frame when the latest annual value is already the most
+    recent period or no matching year-to-date pair exists.
+    """
+    tolerance = pd.Timedelta(days=date_tolerance_days)
+    annual_forms = {form.upper() for form in annual_forms}
+
+    duration = records[records["period_kind"].eq("duration")]
+
+    # Comparative periods repeat across filings; keep the latest filed value.
+    duration = (
+        duration.sort_values("filed")
+        .drop_duplicates(subset=["start", "end"], keep="last")
+    )
+
+    annual = duration[
+        duration["duration_type"].eq("annual")
+        & duration["form"].isin(annual_forms)
+    ]
+
+    if annual.empty:
+        return pd.DataFrame()
+
+    fiscal_year = annual.sort_values("end").iloc[-1]
+
+    interim = duration[
+        duration["duration_type"].isin(["quarterly", "semiannual", "nine_months"])
+    ]
+
+    current = interim[
+        ((interim["start"] - fiscal_year["end"]).abs() <= pd.Timedelta(days=1) + tolerance)
+        & (interim["end"] > fiscal_year["end"])
+    ]
+
+    if current.empty:
+        return pd.DataFrame()
+
+    current_ytd = current.sort_values("end").iloc[-1]
+
+    prior = interim[
+        ((interim["start"] - fiscal_year["start"]).abs() <= tolerance)
+        & (
+            (interim["end"] - (current_ytd["end"] - pd.DateOffset(years=1))).abs()
+            <= tolerance
+        )
+    ]
+
+    if prior.empty:
+        return pd.DataFrame()
+
+    prior_ytd = prior.sort_values("filed").iloc[-1]
+
+    ttm = current.loc[[current_ytd.name]].copy()
+    ttm["val"] = fiscal_year["val"] + current_ytd["val"] - prior_ytd["val"]
+    ttm["start"] = prior_ytd["end"] + pd.Timedelta(days=1)
+    ttm["fp"] = "TTM"
+    ttm["period_days"] = (ttm["end"] - ttm["start"]).dt.days
+    ttm["duration_type"] = "ttm"
+
+    return ttm
+
+
+def select_latest_ttm_record(
+    records: pd.DataFrame,
+    annual_forms: list[str],
+) -> pd.DataFrame:
+    """
+    Select the most recent trailing twelve month record across concepts.
+
+    TTM is built within each concept so the annual and year-to-date pieces
+    always come from the same concept.
+    """
+    if records.empty:
+        return records
+
+    candidates = [
+        build_ttm_record_for_concept(concept_records, annual_forms)
+        for _, concept_records in records.groupby("concept_name", sort=False)
+    ]
+    candidates = [frame for frame in candidates if not frame.empty]
+
+    if not candidates:
+        return pd.DataFrame()
+
+    ttm = pd.concat(candidates).sort_values(["end", "filed"])
+
+    return ttm.tail(1).reset_index(drop=True)
 
 
 def derive_liabilities_record(
