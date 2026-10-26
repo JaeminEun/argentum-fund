@@ -119,6 +119,12 @@ price_history:
   end_date: null
   interval: "1d"
   auto_adjust: false
+  # Only keep fully closed trading sessions, so a run during market
+  # hours gives the same scores as one after the close.
+  completed_sessions_only: true
+  market_timezone: America/New_York
+  market_close: "16:00"
+  close_buffer_minutes: 30
 
   tradable_asset_types:
     - stock

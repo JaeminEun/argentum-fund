@@ -1,5 +1,7 @@
+from datetime import date, datetime, time, timedelta
 from pathlib import Path
 from typing import Any, Dict, Iterable, List
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 import yfinance as yf
@@ -260,6 +262,47 @@ def download_price_history_for_ticker(
         return pd.DataFrame(columns=STANDARD_PRICE_COLUMNS)
 
 
+def last_completed_session_date(
+    now: datetime | None = None,
+    market_timezone: str = "America/New_York",
+    market_close: str = "16:00",
+    close_buffer_minutes: int = 30,
+) -> date:
+    """
+    Latest date whose trading session has closed, in the market's timezone.
+
+    Before the close (plus a buffer for final prices to settle), today's
+    bar is still moving, so the cutoff is yesterday. Weekends and holidays
+    need no special handling: they simply have no rows to keep.
+    """
+    zone = ZoneInfo(market_timezone)
+    now = datetime.now(zone) if now is None else now.astimezone(zone)
+
+    close = datetime.combine(now.date(), time.fromisoformat(market_close), zone)
+    settled = close + timedelta(minutes=close_buffer_minutes)
+
+    return now.date() if now >= settled else now.date() - timedelta(days=1)
+
+
+def drop_incomplete_sessions(prices: pd.DataFrame, cutoff: date) -> pd.DataFrame:
+    """
+    Remove rows dated after the last completed session.
+
+    This keeps scores the same no matter what time of day the pipeline
+    runs, so runs on the same day are comparable.
+    """
+    dates = pd.to_datetime(prices["date"]).dt.date
+    incomplete = dates > cutoff
+
+    if incomplete.any():
+        print(
+            f"Dropping {int(incomplete.sum())} price rows after the last "
+            f"completed session ({cutoff})."
+        )
+
+    return prices[~incomplete].copy()
+
+
 def build_price_history(config_path: str | Path) -> pd.DataFrame:
     """
     Build standardized historical price data for all tradable tickers
@@ -313,6 +356,14 @@ def build_price_history(config_path: str | Path) -> pd.DataFrame:
         raise ValueError("No price history was downloaded.")
 
     price_history = pd.concat(frames, ignore_index=True)
+
+    if price_config.get("completed_sessions_only", True):
+        cutoff = last_completed_session_date(
+            market_timezone=price_config.get("market_timezone", "America/New_York"),
+            market_close=price_config.get("market_close", "16:00"),
+            close_buffer_minutes=price_config.get("close_buffer_minutes", 30),
+        )
+        price_history = drop_incomplete_sessions(price_history, cutoff)
 
     price_history = price_history.sort_values(
         ["ticker", "date"]
