@@ -460,13 +460,13 @@ def select_record_for_metric(
     )
 
 
-def build_ttm_record_for_concept(
+def build_ttm_record(
     records: pd.DataFrame,
     annual_forms: list[str],
     date_tolerance_days: int = 7,
 ) -> pd.DataFrame:
     """
-    Build a trailing twelve month record from one concept's records.
+    Build a trailing twelve month record from a series of duration records.
 
     10-Q filings report fiscal year-to-date values (and cash flow statements
     report only year-to-date), so TTM is computed as:
@@ -535,6 +535,13 @@ def build_ttm_record_for_concept(
     ttm["period_days"] = (ttm["end"] - ttm["start"]).dt.days
     ttm["duration_type"] = "ttm"
 
+    piece_concepts = [
+        fiscal_year["concept_name"],
+        current_ytd["concept_name"],
+        prior_ytd["concept_name"],
+    ]
+    ttm["concept_name"] = " + ".join(dict.fromkeys(piece_concepts))
+
     return ttm
 
 
@@ -545,24 +552,30 @@ def select_latest_ttm_record(
     """
     Select the most recent trailing twelve month record across concepts.
 
-    TTM is built within each concept so the annual and year-to-date pieces
-    always come from the same concept.
+    TTM is first built within each concept so the annual and year-to-date
+    pieces come from the same concept. Many companies use one concept in
+    their 10-K and another in their 10-Qs (for example NetIncomeLoss and
+    ProfitLoss), so TTM is also built from all concepts combined. A
+    single-concept TTM wins when both end on the same date.
     """
     if records.empty:
         return records
 
     candidates = [
-        build_ttm_record_for_concept(concept_records, annual_forms)
+        build_ttm_record(concept_records, annual_forms).assign(single_concept=True)
         for _, concept_records in records.groupby("concept_name", sort=False)
     ]
+    candidates.append(
+        build_ttm_record(records, annual_forms).assign(single_concept=False)
+    )
     candidates = [frame for frame in candidates if not frame.empty]
 
     if not candidates:
         return pd.DataFrame()
 
-    ttm = pd.concat(candidates).sort_values(["end", "filed"])
+    ttm = pd.concat(candidates).sort_values(["end", "single_concept", "filed"])
 
-    return ttm.tail(1).reset_index(drop=True)
+    return ttm.tail(1).drop(columns="single_concept").reset_index(drop=True)
 
 
 def derive_liabilities_record(

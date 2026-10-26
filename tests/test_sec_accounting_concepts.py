@@ -377,3 +377,23 @@ def test_old_concept_ttm_does_not_beat_newer_annual_value():
 
     assert row["concept_name"] == "RevenueFromContract"
     assert row["end"] == pd.Timestamp("2025-12-31")
+
+
+def test_ttm_combines_concepts_when_10k_and_10q_use_different_tags():
+    # Annual net income under NetIncomeLoss, quarterly only under ProfitLoss.
+    row = extract_ttm(
+        {
+            "NetIncomeLoss": [
+                duration_fact("2025-01-01", "2025-03-31", 148.2, "10-Q", "Q1"),
+                duration_fact("2025-01-01", "2025-12-31", 643.8),
+            ],
+            "ProfitLoss": [
+                duration_fact("2026-01-01", "2026-03-31", 138.1, "10-Q", "Q1"),
+            ],
+        },
+        ["NetIncomeLoss", "ProfitLoss"],
+    )
+
+    assert row["val"] == pytest.approx(643.8 + 138.1 - 148.2)
+    assert row["end"] == pd.Timestamp("2026-03-31")
+    assert row["concept_name"] == "NetIncomeLoss + ProfitLoss"
