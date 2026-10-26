@@ -239,9 +239,12 @@ def extract_candidate_concept_records(
     that are years out of date. Records from every candidate are combined so
     the period selection step can pick the most recent one.
 
-    When several concepts report the same period, only the records from the
-    earliest-listed candidate are kept, so candidate order still sets the
-    preference.
+    When several concepts report the same period on the same form, only the
+    records from the earliest-listed candidate are kept, so candidate order
+    still sets the preference. The comparison is per form because some
+    concepts appear on forms filtered out later; for example, proxy
+    statements (DEF 14A) report NetIncomeLoss for pay-versus-performance
+    tables and must not displace 10-K ProfitLoss values.
 
     Example:
         metric_name = revenue
@@ -293,7 +296,7 @@ def extract_candidate_concept_records(
 
     # Instant facts have no start date, so keep missing keys as a group.
     best_priority = records.groupby(
-        ["start", "end"],
+        ["start", "end", "form"],
         dropna=False,
     )["candidate_priority"].transform("min")
 

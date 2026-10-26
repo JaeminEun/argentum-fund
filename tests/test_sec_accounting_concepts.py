@@ -92,6 +92,43 @@ def test_earlier_candidate_wins_when_both_report_same_period():
     assert records["val"].tolist() == [260.0]
 
 
+def test_proxy_statement_values_do_not_displace_annual_filings():
+    # Proxy pay-versus-performance tables report NetIncomeLoss for periods
+    # whose 10-K values are only under ProfitLoss.
+    facts = make_facts(
+        {
+            "NetIncomeLoss": [
+                duration_fact("2025-01-01", "2025-12-31", 2204.0, form="DEF 14A", fp=None),
+                duration_fact("2009-01-01", "2009-03-31", 207.0, form="10-Q", fp="Q1"),
+            ],
+            "ProfitLoss": [
+                duration_fact("2020-01-01", "2020-12-31", 865.0),
+                duration_fact("2025-01-01", "2025-12-31", 4152.0),
+            ],
+        }
+    )
+
+    selected = extract_accounting_concepts_for_company(
+        facts=facts,
+        ticker="EX",
+        cik_padded="0000000001",
+        concepts_config={
+            "net_income": {
+                "taxonomy": "us-gaap",
+                "candidates": ["NetIncomeLoss", "ProfitLoss"],
+            }
+        },
+        preferred_forms=["10-K", "10-Q"],
+        annual_forms=["10-K"],
+        metric_period_types={"net_income": "duration_annual"},
+    )
+
+    row = selected.iloc[0]
+    assert row["concept_name"] == "ProfitLoss"
+    assert row["end"] == pd.Timestamp("2025-12-31")
+    assert row["val"] == 4152.0
+
+
 def test_instant_facts_survive_candidate_merge():
     # Balance sheet facts have no start date; they must not be dropped.
     facts = make_facts(
