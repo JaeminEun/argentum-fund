@@ -42,6 +42,7 @@ def load_data_health_settings(config_path: str | Path) -> Dict[str, Any]:
             for metric, period_type in metric_period_types.items()
             if period_type == "duration_annual"
         ],
+        "accounting_metrics": list(accounting_config.get("concepts", {}).keys()),
         "reference_metric": health_config.get("reference_metric", "net_income"),
         "max_metric_age_days": int(health_config.get("max_metric_age_days", 548)),
         "period_mismatch_tolerance_days": int(
@@ -112,6 +113,33 @@ def check_stale_metrics(
     )
 
     return make_issues(stale, "fundamentals", "stale_metric", detail)
+
+
+def check_missing_metrics(
+    concepts: pd.DataFrame,
+    metrics: list[str],
+) -> pd.DataFrame:
+    """
+    Flag configured accounting metrics with no value for a ticker.
+
+    Stale values may be dropped during extraction, so coverage has to be
+    tracked alongside staleness to see the full picture.
+    """
+    present = set(zip(concepts["ticker"], concepts["metric_name"]))
+
+    missing = pd.DataFrame(
+        [
+            {"ticker": ticker, "metric_name": metric}
+            for ticker in sorted(concepts["ticker"].unique())
+            for metric in metrics
+            if (ticker, metric) not in present
+        ],
+        columns=["ticker", "metric_name"],
+    )
+
+    detail = missing["metric_name"] + " missing"
+
+    return make_issues(missing, "fundamentals", "missing_metric", detail)
 
 
 def check_period_mismatch(
@@ -336,6 +364,7 @@ def run_data_health(config_path: str | Path) -> tuple[pd.DataFrame, pd.DataFrame
         tickers_checked["fundamentals"] = concepts["ticker"].nunique()
         issue_frames += [
             check_stale_metrics(concepts, as_of, settings["max_metric_age_days"]),
+            check_missing_metrics(concepts, settings["accounting_metrics"]),
             check_period_mismatch(
                 concepts,
                 settings["duration_metrics"],
@@ -347,6 +376,7 @@ def run_data_health(config_path: str | Path) -> tuple[pd.DataFrame, pd.DataFrame
         checks.update(
             {
                 "stale_metric": "fundamentals",
+                "missing_metric": "fundamentals",
                 "period_mismatch": "fundamentals",
                 "non_annual_duration": "fundamentals",
             }

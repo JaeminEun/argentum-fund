@@ -174,3 +174,101 @@ def test_missing_concepts_return_empty_frame():
     )
 
     assert records.empty
+
+
+BALANCE_SHEET_CONFIG = {
+    "assets": {"taxonomy": "us-gaap", "candidates": ["Assets"]},
+    "liabilities": {"taxonomy": "us-gaap", "candidates": ["Liabilities"]},
+}
+
+DERIVED_LIABILITIES_CONFIG = {
+    "enabled": True,
+    "equity_candidates": [
+        "StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest",
+        "StockholdersEquity",
+    ],
+}
+
+
+def extract_balance_sheet(concepts, **kwargs):
+    return extract_accounting_concepts_for_company(
+        facts=make_facts(concepts),
+        ticker="EX",
+        cik_padded="0000000001",
+        concepts_config=BALANCE_SHEET_CONFIG,
+        preferred_forms=["10-K", "10-Q"],
+        annual_forms=["10-K"],
+        metric_period_types={
+            "assets": "instant_latest",
+            "liabilities": "instant_latest",
+        },
+        derived_liabilities_config=DERIVED_LIABILITIES_CONFIG,
+        **kwargs,
+    ).set_index("metric_name")
+
+
+def test_liabilities_derived_from_assets_minus_total_equity():
+    selected = extract_balance_sheet(
+        {
+            "Assets": [instant_fact("2025-12-31", 1000.0)],
+            "StockholdersEquity": [instant_fact("2025-12-31", 350.0)],
+            "StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest": [
+                instant_fact("2025-12-31", 400.0),
+            ],
+        }
+    )
+
+    liabilities = selected.loc["liabilities"]
+    assert liabilities["val"] == 600.0
+    assert liabilities["taxonomy"] == "derived"
+    assert liabilities["end"] == pd.Timestamp("2025-12-31")
+
+
+def test_reported_liabilities_kept_when_current():
+    selected = extract_balance_sheet(
+        {
+            "Assets": [instant_fact("2025-12-31", 1000.0)],
+            "Liabilities": [instant_fact("2025-12-31", 580.0)],
+            "StockholdersEquity": [instant_fact("2025-12-31", 350.0)],
+        }
+    )
+
+    assert selected.loc["liabilities", "val"] == 580.0
+    assert selected.loc["liabilities", "taxonomy"] == "us-gaap"
+
+
+def test_stale_reported_liabilities_replaced_by_derived_value():
+    selected = extract_balance_sheet(
+        {
+            "Assets": [instant_fact("2025-12-31", 1000.0)],
+            "Liabilities": [instant_fact("2016-12-31", 300.0)],
+            "StockholdersEquity": [instant_fact("2025-12-31", 350.0)],
+        }
+    )
+
+    assert selected.loc["liabilities", "val"] == 650.0
+    assert selected.loc["liabilities", "end"] == pd.Timestamp("2025-12-31")
+
+
+def test_no_derivation_without_equity_on_assets_date():
+    selected = extract_balance_sheet(
+        {
+            "Assets": [instant_fact("2025-12-31", 1000.0)],
+            "StockholdersEquity": [instant_fact("2024-12-31", 350.0)],
+        }
+    )
+
+    assert "liabilities" not in selected.index
+
+
+def test_values_far_older_than_latest_filing_are_dropped():
+    selected = extract_balance_sheet(
+        {
+            "Assets": [instant_fact("2025-12-31", 1000.0)],
+            "Liabilities": [instant_fact("2016-12-31", 300.0)],
+        },
+        max_metric_age_days=548,
+    )
+
+    # No equity to derive from, so the 2016 value is dropped, not scored.
+    assert selected.index.tolist() == ["assets"]
