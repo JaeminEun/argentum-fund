@@ -11,6 +11,7 @@ from src.evaluation.runs import (
     create_run_dir,
     load_evaluation_config,
     snapshot_pipeline_outputs,
+    snapshot_universe,
     write_run_metadata,
 )
 
@@ -49,6 +50,7 @@ def run_evaluation(
     print(f"Evaluation run '{label}' -> {run_dir}")
 
     captured = snapshot_pipeline_outputs(run_dir, evaluation_config)
+    universes = snapshot_universe(run_dir, config_path)
 
     write_run_metadata(
         run_dir,
@@ -56,6 +58,7 @@ def run_evaluation(
         extra={
             "config_path": config_path,
             "snapshotted_outputs": captured,
+            "universes": universes,
             "include_holdout": include_holdout,
             "backtest_run": not skip_backtest,
         },
