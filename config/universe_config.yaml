@@ -238,6 +238,20 @@ sec_accounting_concepts:
     liabilities: instant_latest
     stockholders_equity: instant_latest
 
+  # Values whose period ended this long before the company's latest filing
+  # are dropped instead of being scored as current. Matches the data health
+  # stale_metric threshold.
+  max_metric_age_days: 548
+
+  # Used when a company reports no Liabilities line for its latest balance
+  # sheet date: liabilities = assets - total equity.
+  derived_liabilities:
+    enabled: true
+    taxonomy: us-gaap
+    equity_candidates:
+      - StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest
+      - StockholdersEquity
+
   concepts:
     revenue:
       taxonomy: us-gaap
@@ -245,6 +259,9 @@ sec_accounting_concepts:
         - Revenues
         - RevenueFromContractWithCustomerExcludingAssessedTax
         - SalesRevenueNet
+        - RevenueFromContractWithCustomerIncludingAssessedTax
+        - RegulatedAndUnregulatedOperatingRevenue
+        - RevenuesNetOfInterestExpense
 
     net_income:
       taxonomy: us-gaap

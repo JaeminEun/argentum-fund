@@ -239,9 +239,12 @@ def extract_candidate_concept_records(
     that are years out of date. Records from every candidate are combined so
     the period selection step can pick the most recent one.
 
-    When several concepts report the same period, only the records from the
-    earliest-listed candidate are kept, so candidate order still sets the
-    preference.
+    When several concepts report the same period on the same form, only the
+    records from the earliest-listed candidate are kept, so candidate order
+    still sets the preference. The comparison is per form because some
+    concepts appear on forms filtered out later; for example, proxy
+    statements (DEF 14A) report NetIncomeLoss for pay-versus-performance
+    tables and must not displace 10-K ProfitLoss values.
 
     Example:
         metric_name = revenue
@@ -293,7 +296,7 @@ def extract_candidate_concept_records(
 
     # Instant facts have no start date, so keep missing keys as a group.
     best_priority = records.groupby(
-        ["start", "end"],
+        ["start", "end", "form"],
         dropna=False,
     )["candidate_priority"].transform("min")
 
@@ -437,6 +440,88 @@ def select_record_for_metric(
     )
 
 
+def derive_liabilities_record(
+    selected: pd.DataFrame,
+    facts: Dict[str, Any],
+    ticker: str,
+    cik_padded: str,
+    equity_config: Dict[str, Any],
+    preferred_forms: list[str],
+) -> pd.DataFrame:
+    """
+    Derive liabilities as assets minus total equity when no reported
+    liabilities value matches the latest assets date.
+
+    Many companies (especially utilities and industrials) never report a
+    total Liabilities line. Assets equal liabilities plus equity, so total
+    equity including noncontrolling interests gives the remainder. Temporary
+    (mezzanine) equity, such as redeemable preferred stock, ends up counted
+    as a liability, which is the conservative direction.
+    """
+    assets = selected[selected["metric_name"].eq("assets")]
+
+    if assets.empty:
+        return pd.DataFrame()
+
+    assets_row = assets.iloc[0]
+
+    reported = selected[selected["metric_name"].eq("liabilities")]
+
+    if not reported.empty and reported.iloc[0]["end"] >= assets_row["end"]:
+        return pd.DataFrame()
+
+    equity = extract_candidate_concept_records(
+        facts=facts,
+        ticker=ticker,
+        cik_padded=cik_padded,
+        metric_name="total_equity",
+        concept_config=equity_config,
+    )
+
+    if equity.empty:
+        return pd.DataFrame()
+
+    equity = filter_preferred_forms(equity, preferred_forms)
+    equity = equity[
+        equity["period_kind"].eq("instant")
+        & equity["end"].eq(assets_row["end"])
+    ]
+
+    if equity.empty:
+        return pd.DataFrame()
+
+    equity_row = equity.sort_values("filed").iloc[-1]
+
+    derived = assets.head(1).copy()
+    derived["metric_name"] = "liabilities"
+    derived["taxonomy"] = "derived"
+    derived["concept_name"] = f"Assets minus {equity_row['concept_name']}"
+    derived["val"] = assets_row["val"] - equity_row["val"]
+    derived["filed"] = max(assets_row["filed"], equity_row["filed"])
+
+    return derived
+
+
+def drop_stale_records(
+    selected: pd.DataFrame,
+    max_metric_age_days: int,
+) -> pd.DataFrame:
+    """
+    Drop metric values that are far older than the company's latest filing.
+
+    A value from years ago is worse than a missing one: combined with
+    current values it produces implausible ratios (for example 2010 revenue
+    against 2025 net income). Scoring already handles missing metrics.
+    """
+    if selected.empty:
+        return selected
+
+    latest_filed = selected["filed"].max()
+    age_days = (latest_filed - selected["end"]).dt.days
+
+    return selected[~(age_days > max_metric_age_days)].reset_index(drop=True)
+
+
 def extract_accounting_concepts_for_company(
     facts: Dict[str, Any],
     ticker: str,
@@ -445,9 +530,15 @@ def extract_accounting_concepts_for_company(
     preferred_forms: list[str],
     annual_forms: list[str],
     metric_period_types: Dict[str, str],
+    derived_liabilities_config: Dict[str, Any] | None = None,
+    max_metric_age_days: int | None = None,
 ) -> pd.DataFrame:
     """
     Extract configured accounting concepts for one company.
+
+    Optionally derives liabilities when they are not reported, and drops
+    values older than max_metric_age_days relative to the company's latest
+    filing.
     """
     selected_records = []
 
@@ -481,7 +572,34 @@ def extract_accounting_concepts_for_company(
     if not selected_records:
         return pd.DataFrame()
 
-    return pd.concat(selected_records, ignore_index=True)
+    company_records = pd.concat(selected_records, ignore_index=True)
+
+    if derived_liabilities_config and derived_liabilities_config.get("enabled", False):
+        derived = derive_liabilities_record(
+            selected=company_records,
+            facts=facts,
+            ticker=ticker,
+            cik_padded=cik_padded,
+            equity_config={
+                "taxonomy": derived_liabilities_config.get("taxonomy", "us-gaap"),
+                "candidates": derived_liabilities_config.get("equity_candidates", []),
+            },
+            preferred_forms=preferred_forms,
+        )
+
+        if not derived.empty:
+            company_records = pd.concat(
+                [
+                    company_records[~company_records["metric_name"].eq("liabilities")],
+                    derived,
+                ],
+                ignore_index=True,
+            )
+
+    if max_metric_age_days is not None:
+        company_records = drop_stale_records(company_records, max_metric_age_days)
+
+    return company_records
 
 
 def build_sec_accounting_concepts(
@@ -518,6 +636,13 @@ def build_sec_accounting_concepts(
     if not concepts_config:
         raise ValueError("No accounting concepts configured.")
 
+    derived_liabilities_config = accounting_config.get("derived_liabilities", {})
+
+    max_metric_age_days = accounting_config.get("max_metric_age_days")
+
+    if max_metric_age_days is not None:
+        max_metric_age_days = int(max_metric_age_days)
+
     summary = load_company_facts_summary(input_summary_path)
 
     success = summary[summary["status"] == "success"].copy()
@@ -549,6 +674,8 @@ def build_sec_accounting_concepts(
                 preferred_forms=preferred_forms,
                 annual_forms=annual_forms,
                 metric_period_types=metric_period_types,
+                derived_liabilities_config=derived_liabilities_config,
+                max_metric_age_days=max_metric_age_days,
             )
 
             if not company_records.empty:
@@ -576,6 +703,9 @@ def build_sec_accounting_concepts(
 
     print("\nMetric counts:")
     print(concepts["metric_name"].value_counts(dropna=False))
+
+    derived_count = concepts["taxonomy"].eq("derived").sum()
+    print(f"\nDerived values: {derived_count}")
 
     print("\nSelected period types:")
     period_summary_columns = [
