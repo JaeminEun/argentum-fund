@@ -5,7 +5,7 @@ import json
 import time
 from pathlib import Path
 from typing import Any, Dict
-from urllib.parse import quote_plus
+from urllib.parse import quote_plus, urlparse
 
 import requests
 
@@ -181,10 +181,11 @@ class SecClient:
                 return json.load(file)
 
         headers = self.headers.copy()
+        parsed_host = urlparse(url).hostname
 
         if host is not None:
             headers["Host"] = host
-        elif "www.sec.gov" in url:
+        elif parsed_host == "www.sec.gov":
             headers["Host"] = "www.sec.gov"
         else:
             headers["Host"] = "data.sec.gov"
