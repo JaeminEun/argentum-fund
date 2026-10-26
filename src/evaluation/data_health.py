@@ -1,15 +1,25 @@
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import Any, Dict
 
 import pandas as pd
 
 from src.scoring.price_scores import REQUIRED_SCORE_INPUT_COLUMNS
+from src.sec.cik import normalize_ticker_for_sec
 from src.universe.config import load_config
 
 
 ISSUE_COLUMNS = ["area", "check", "ticker", "detail"]
+
+# Words that carry no identity when comparing company names.
+NAME_STOP_WORDS = {
+    "INC", "CORP", "CORPORATION", "CO", "COS", "COMPANY", "COMPANIES", "LTD",
+    "PLC", "SA", "NV", "AG", "LP", "LLC", "HOLDINGS", "HOLDING", "GROUP",
+    "THE", "CLASS", "CL", "OF", "AND", "DE", "NEW", "INTERNATIONAL", "INTL",
+    "TRUST", "COM", "SHS", "ORD", "ADR",
+}
 
 DEFAULT_IMPLAUSIBLE_RATIO_BOUNDS = {
     "net_margin": {"upper": 1.0},
@@ -27,6 +37,7 @@ def load_data_health_settings(config_path: str | Path) -> Dict[str, Any]:
 
     health_config = config.get("evaluation", {}).get("data_health", {})
     accounting_config = config.get("sec_accounting_concepts", {})
+    facts_config = config.get("sec_company_facts", {})
     factor_config = config.get("sec_fundamental_factors", {})
     price_factor_config = config.get("price_factors", {})
 
@@ -37,6 +48,14 @@ def load_data_health_settings(config_path: str | Path) -> Dict[str, Any]:
         "fundamental_factors_path": factor_config.get("output_path"),
         "price_history_path": price_factor_config.get("input_price_path"),
         "latest_price_factors_path": price_factor_config.get("output_latest_path"),
+        "universe_path": config.get("project", {}).get("output_path"),
+        "sec_ticker_reference_path": config.get("sec_reference", {}).get(
+            "company_tickers_output_path"
+        ),
+        "security_master_path": config.get("security_master", {}).get("path"),
+        "companyfacts_summary_path": facts_config.get("output_summary_path"),
+        "max_universe_age_days": int(health_config.get("max_universe_age_days", 45)),
+        "new_registrant_days": int(health_config.get("new_registrant_days", 365)),
         "duration_metrics": [
             metric
             for metric, period_type in metric_period_types.items()
@@ -298,6 +317,214 @@ def check_missing_score_inputs(latest_factors: pd.DataFrame) -> pd.DataFrame:
     return make_issues(flagged, "prices", "missing_score_input", detail)
 
 
+def parse_universe_dates(values: pd.Series) -> pd.Series:
+    """
+    Parse universe as_of dates written either as ISO or as dd/mm/yyyy.
+    """
+    text = values.astype("string").str.strip()
+    iso = pd.to_datetime(text, format="%Y-%m-%d", errors="coerce")
+    day_first = pd.to_datetime(text, format="%d/%m/%Y", errors="coerce")
+
+    return iso.fillna(day_first)
+
+
+def check_stale_universe_files(
+    universe: pd.DataFrame,
+    as_of: pd.Timestamp,
+    max_age_days: int,
+) -> pd.DataFrame:
+    """
+    Flag holdings in universe files that have not been refreshed recently.
+
+    Index and Autopilot holdings change over time; an old file scores
+    companies that may no longer belong in the universe.
+    """
+    file_dates = parse_universe_dates(universe["as_of_date"])
+    age_days = (as_of - file_dates).dt.days
+    stale = universe[age_days > max_age_days]
+    stale_dates = file_dates[stale.index]
+
+    detail = (
+        stale["universe_name"]
+        + " file as of "
+        + stale_dates.dt.strftime("%Y-%m-%d")
+        + " ("
+        + age_days[stale.index].astype(int).astype(str)
+        + " days old)"
+    )
+
+    return make_issues(stale, "universe", "stale_universe_file", detail)
+
+
+def check_tickers_not_in_sec(
+    stocks: pd.DataFrame,
+    sec_tickers: pd.DataFrame,
+) -> pd.DataFrame:
+    """
+    Flag stocks whose ticker is no longer in the SEC ticker list.
+
+    Usually the company was acquired, delisted or renamed; its SEC data
+    can no longer be found by ticker.
+    """
+    missing = stocks[~stocks["sec_ticker"].isin(sec_tickers["ticker"])]
+    detail = (
+        missing["universe_name"]
+        + ": not in SEC ticker list (acquired, delisted, renamed or not an SEC filer)"
+    )
+
+    return make_issues(missing, "universe", "ticker_not_in_sec", detail)
+
+
+def check_cik_changes(
+    stocks: pd.DataFrame,
+    sec_tickers: pd.DataFrame,
+    security_master: pd.DataFrame,
+) -> pd.DataFrame:
+    """
+    Flag tickers whose SEC registrant differs from the one on record.
+
+    A new CIK behind the same ticker means a new legal entity, such as a
+    holding company reorganization; its filings start without the
+    predecessor's history.
+    """
+    recorded = (
+        security_master.assign(
+            sec_ticker=security_master["ticker"].apply(normalize_ticker_for_sec),
+            recorded_cik=pd.to_numeric(security_master["cik"], errors="coerce"),
+        )
+        .dropna(subset=["recorded_cik"])
+        .drop_duplicates("sec_ticker")[["sec_ticker", "recorded_cik"]]
+    )
+    current = sec_tickers.rename(
+        columns={"ticker": "sec_ticker", "cik": "sec_cik", "company_name": "sec_name"}
+    )[["sec_ticker", "sec_cik", "sec_name"]]
+
+    merged = (
+        stocks.drop_duplicates("ticker")
+        .merge(recorded, on="sec_ticker")
+        .merge(current, on="sec_ticker")
+    )
+    changed = merged[
+        merged["recorded_cik"].astype("int64") != pd.to_numeric(merged["sec_cik"]).astype("int64")
+    ]
+
+    detail = (
+        "recorded CIK "
+        + changed["recorded_cik"].astype("int64").astype(str)
+        + ", SEC now lists "
+        + pd.to_numeric(changed["sec_cik"]).astype("int64").astype(str)
+        + " ("
+        + changed["sec_name"].astype(str)
+        + ")"
+    )
+
+    return make_issues(changed, "universe", "cik_changed", detail)
+
+
+def name_tokens(name: object) -> set[str]:
+    """
+    Identifying words in a company name.
+
+    Single letters are joined to the previous word so that "LOWE S"
+    matches "LOWES" and "P G + E" matches "PG&E".
+    """
+    words = re.sub(r"[^A-Z0-9]+", " ", str(name).upper().replace("'", "")).split()
+    merged: list[str] = []
+
+    for word in words:
+        if len(word) == 1 and merged and (word == "S" or len(merged[-1]) <= 2):
+            merged[-1] += word
+        else:
+            merged.append(word)
+
+    return {word for word in merged if word not in NAME_STOP_WORDS and len(word) > 1}
+
+
+def check_name_mismatches(
+    stocks: pd.DataFrame,
+    sec_tickers: pd.DataFrame,
+) -> pd.DataFrame:
+    """
+    Flag stocks whose name shares no identifying word with the SEC name.
+
+    This catches a ticker that now belongs to a different company.
+    Abbreviated names (e.g. WABTEC) can also be flagged; check the detail.
+    """
+    merged = stocks.drop_duplicates("ticker").merge(
+        sec_tickers.rename(columns={"ticker": "sec_ticker", "company_name": "sec_name"})[
+            ["sec_ticker", "sec_name"]
+        ],
+        on="sec_ticker",
+    )
+    shares_word = [
+        bool(name_tokens(own) & name_tokens(sec))
+        for own, sec in zip(merged["company_name"], merged["sec_name"])
+    ]
+    mismatched = merged[~pd.Series(shares_word, index=merged.index) & merged["company_name"].notna()]
+
+    detail = (
+        "universe name '"
+        + mismatched["company_name"].astype(str)
+        + "' vs SEC name '"
+        + mismatched["sec_name"].astype(str)
+        + "'"
+    )
+
+    return make_issues(mismatched, "universe", "name_mismatch", detail)
+
+
+def check_new_registrants(
+    stocks: pd.DataFrame,
+    facts_summary: pd.DataFrame,
+    as_of: pd.Timestamp,
+    new_registrant_days: int,
+) -> pd.DataFrame:
+    """
+    Flag stocks whose SEC registrant has less than a year of annual reports.
+
+    Spin-offs and new holding companies start a fresh CIK, so trailing
+    fundamentals are missing or cover only the new entity.
+    """
+    if "first_annual_report_filed" not in facts_summary.columns:
+        return pd.DataFrame(columns=ISSUE_COLUMNS)
+
+    summary = facts_summary[facts_summary["status"] == "success"].copy()
+    summary = summary[summary["ticker"].isin(stocks["ticker"])]
+    first_filed = pd.to_datetime(summary["first_annual_report_filed"], errors="coerce")
+
+    no_annual = first_filed.isna()
+    recent = (as_of - first_filed).dt.days < new_registrant_days
+    flagged = summary[no_annual | recent]
+    flagged_first = first_filed[flagged.index]
+
+    detail = pd.Series(
+        [
+            f"CIK {cik}: no annual report filed yet"
+            if pd.isna(first)
+            else f"CIK {cik}: first annual report filed {first.date()}"
+            for cik, first in zip(flagged["cik"], flagged_first)
+        ],
+        index=flagged.index,
+        dtype="object",
+    )
+
+    return make_issues(flagged, "universe", "new_sec_registrant", detail)
+
+
+def load_universe_for_checks(universe_path: str | Path | None) -> pd.DataFrame | None:
+    """
+    Load the built universe with identifiers as text.
+    """
+    universe = read_optional_csv(universe_path, dtype=str)
+
+    if universe is None:
+        return None
+
+    universe["sec_ticker"] = universe["ticker"].apply(normalize_ticker_for_sec)
+
+    return universe
+
+
 def summarize_issues(
     issues: pd.DataFrame,
     tickers_checked: Dict[str, int],
@@ -361,7 +588,7 @@ def run_data_health(config_path: str | Path) -> tuple[pd.DataFrame, pd.DataFrame
 
     issue_frames = []
     checks: Dict[str, str] = {}
-    tickers_checked = {"fundamentals": 0, "prices": 0}
+    tickers_checked = {"fundamentals": 0, "prices": 0, "universe": 0}
 
     if concepts is not None:
         tickers_checked["fundamentals"] = concepts["ticker"].nunique()
@@ -417,6 +644,46 @@ def run_data_health(config_path: str | Path) -> tuple[pd.DataFrame, pd.DataFrame
             check_short_history(prices, settings["min_price_history_days"])
         )
         checks["short_history"] = "prices"
+
+    universe = load_universe_for_checks(settings["universe_path"])
+
+    if universe is not None:
+        tickers_checked["universe"] = universe["ticker"].nunique()
+        issue_frames.append(
+            check_stale_universe_files(universe, as_of, settings["max_universe_age_days"])
+        )
+        checks["stale_universe_file"] = "universe"
+
+        stocks = universe[universe["asset_type"] == "stock"]
+        sec_tickers = read_optional_csv(
+            settings["sec_ticker_reference_path"], dtype={"cik_padded": str}
+        )
+
+        if sec_tickers is not None:
+            sec_tickers["ticker"] = sec_tickers["ticker"].apply(normalize_ticker_for_sec)
+            issue_frames += [
+                check_tickers_not_in_sec(stocks, sec_tickers),
+                check_name_mismatches(stocks, sec_tickers),
+            ]
+            checks.update(
+                {"ticker_not_in_sec": "universe", "name_mismatch": "universe"}
+            )
+
+            security_master = read_optional_csv(settings["security_master_path"], dtype=str)
+            if security_master is not None:
+                issue_frames.append(check_cik_changes(stocks, sec_tickers, security_master))
+                checks["cik_changed"] = "universe"
+
+        facts_summary = read_optional_csv(
+            settings["companyfacts_summary_path"], dtype={"cik_padded": str}
+        )
+        if facts_summary is not None:
+            issue_frames.append(
+                check_new_registrants(
+                    stocks, facts_summary, as_of, settings["new_registrant_days"]
+                )
+            )
+            checks["new_sec_registrant"] = "universe"
 
     issues = (
         pd.concat(issue_frames, ignore_index=True)

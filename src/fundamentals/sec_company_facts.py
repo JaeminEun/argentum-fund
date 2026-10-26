@@ -184,6 +184,34 @@ def fetch_companyfacts(
     return facts
 
 
+ANNUAL_REPORT_FORMS = {"10-K", "10-K/A", "10-KT", "20-F", "20-F/A", "40-F", "40-F/A"}
+
+
+def summarize_annual_reports(facts_root: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Date of the first annual report and how many annual reports a
+    company has filed under this CIK.
+
+    A short annual history usually means a new registrant: a spin-off,
+    a new holding company, or a recent listing.
+    """
+    filings: Dict[str, str] = {}
+
+    for taxonomy in facts_root.values():
+        for concept in taxonomy.values():
+            for entries in concept.get("units", {}).values():
+                for entry in entries:
+                    if entry.get("form") in ANNUAL_REPORT_FORMS and entry.get("accn"):
+                        filings.setdefault(entry["accn"], entry.get("filed", ""))
+
+    filed_dates = sorted(date for date in filings.values() if date)
+
+    return {
+        "first_annual_report_filed": filed_dates[0] if filed_dates else "",
+        "annual_reports_filed": len(filings),
+    }
+
+
 def summarize_companyfacts(
     facts: Dict[str, Any],
     ticker: str,
@@ -214,6 +242,7 @@ def summarize_companyfacts(
         "us_gaap_concepts_count": len(us_gaap_concepts),
         "dei_concepts_count": len(dei_concepts),
         "sample_us_gaap_concepts": "; ".join(sorted(us_gaap_concepts)[:15]),
+        **summarize_annual_reports(facts_root),
         "retrieved_at_utc": datetime.now(timezone.utc).isoformat(),
         "status": "success",
         "error_message": "",

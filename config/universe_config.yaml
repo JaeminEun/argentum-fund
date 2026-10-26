@@ -555,6 +555,11 @@ evaluation:
     period_mismatch_tolerance_days: 45
     stale_price_days: 7
     min_price_history_days: 252
+    # Universe files older than this are flagged for a refresh.
+    max_universe_age_days: 45
+    # Registrants with a first annual report more recent than this
+    # (spin-offs, new holding companies) are flagged.
+    new_registrant_days: 365
     implausible_ratio_bounds:
       net_margin:
         upper: 1.0
