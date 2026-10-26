@@ -15,3 +15,21 @@ Additions:
    1.
    2. 23/05/2026
    3. Failed ticker report to csv or txt (24/05/2026)
+   4. Include a new module that deals with metrics like P/E,P/B, FCF possibly for new version
+      (24/05/2026)
+   5. Need more explanation of the financial side of things, make sure to follow up before
+      committing the price scores.
+   6. S&P500 Value stocks themself can be extracted from SEC API now no?
+   7. How often does the SEC information need to be updated? Should the first step i.e.
+      universes check to see if SEC data has updated? Does this give further credence to include the 
+      SEC API earlier?
+   8. Need to distinguish quarterly value, annual value, trailing 12 months for future accounting extraction
+      (26/05/2026)
+   9. Add valuation scores (like P/E ratio), and need an explanation why we don't have that info now.
+   10. Accounting (fundamental scoring) sector differences need to be addressed.
+   11. Sector awareness scoring... retrieving universes, this has to then be standardized?
+   12. Price factor calculator: add weighted histories (27/05/2026)
+   13. How to add more macro contexts
+   14. Value trap screening: threshold is too strict.
+
+
