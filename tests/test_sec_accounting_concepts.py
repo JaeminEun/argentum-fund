@@ -1,4 +1,5 @@
 import pandas as pd
+import pytest
 
 from src.fundamentals.sec_accounting_concepts import (
     extract_accounting_concepts_for_company,
@@ -272,3 +273,127 @@ def test_values_far_older_than_latest_filing_are_dropped():
 
     # No equity to derive from, so the 2016 value is dropped, not scored.
     assert selected.index.tolist() == ["assets"]
+
+
+def extract_ttm(concepts, candidates):
+    return extract_accounting_concepts_for_company(
+        facts=make_facts(concepts),
+        ticker="EX",
+        cik_padded="0000000001",
+        concepts_config={"revenue": {"taxonomy": "us-gaap", "candidates": candidates}},
+        preferred_forms=["10-K", "10-Q"],
+        annual_forms=["10-K"],
+        metric_period_types={"revenue": "duration_ttm"},
+    ).iloc[0]
+
+
+def test_ttm_combines_annual_and_year_to_date_with_52_53_week_calendar():
+    # Apple-style fiscal calendar, values in billions.
+    row = extract_ttm(
+        {
+            "Revenue": [
+                duration_fact("2023-10-01", "2024-09-28", 391.035),
+                duration_fact("2024-09-29", "2024-12-28", 124.300, "10-Q", "Q1"),
+                duration_fact("2024-09-29", "2025-03-29", 219.659, "10-Q", "Q2"),
+                duration_fact("2024-09-29", "2025-09-27", 416.161),
+                duration_fact("2025-09-28", "2025-12-27", 143.756, "10-Q", "Q1"),
+                duration_fact("2025-12-28", "2026-03-28", 111.184, "10-Q", "Q2"),
+                duration_fact("2025-09-28", "2026-03-28", 254.940, "10-Q", "Q2"),
+            ]
+        },
+        ["Revenue"],
+    )
+
+    assert row["val"] == pytest.approx(416.161 + 254.940 - 219.659)
+    assert row["end"] == pd.Timestamp("2026-03-28")
+    assert row["duration_type"] == "ttm"
+    assert 360 <= row["period_days"] <= 370
+
+
+def test_ttm_uses_year_to_date_cash_flow_values():
+    # Cash flow statements only report year-to-date in 10-Qs.
+    row = extract_ttm(
+        {
+            "Capex": [
+                duration_fact("2024-01-01", "2024-12-31", 425.0),
+                duration_fact("2025-01-01", "2025-03-31", 117.0, "10-Q", "Q1"),
+                duration_fact("2025-01-01", "2025-12-31", 527.0),
+                duration_fact("2026-01-01", "2026-03-31", 114.0, "10-Q", "Q1"),
+            ]
+        },
+        ["Capex"],
+    )
+
+    assert row["val"] == pytest.approx(527.0 + 114.0 - 117.0)
+    assert row["end"] == pd.Timestamp("2026-03-31")
+
+
+def test_ttm_falls_back_to_annual_after_a_10k():
+    row = extract_ttm(
+        {
+            "Revenue": [
+                duration_fact("2025-01-01", "2025-09-30", 300.0, "10-Q", "Q3"),
+                duration_fact("2025-01-01", "2025-12-31", 400.0),
+            ]
+        },
+        ["Revenue"],
+    )
+
+    assert row["val"] == 400.0
+    assert row["duration_type"] == "annual"
+
+
+def test_ttm_without_prior_year_to_date_falls_back_to_annual():
+    row = extract_ttm(
+        {
+            "Revenue": [
+                duration_fact("2025-01-01", "2025-12-31", 400.0),
+                duration_fact("2026-01-01", "2026-03-31", 110.0, "10-Q", "Q1"),
+            ]
+        },
+        ["Revenue"],
+    )
+
+    assert row["val"] == 400.0
+    assert row["duration_type"] == "annual"
+
+
+def test_old_concept_ttm_does_not_beat_newer_annual_value():
+    row = extract_ttm(
+        {
+            "Revenues": [
+                duration_fact("2016-01-01", "2016-12-31", 90.0),
+                duration_fact("2016-01-01", "2016-03-31", 20.0, "10-Q", "Q1"),
+                duration_fact("2017-01-01", "2017-12-31", 100.0),
+                duration_fact("2018-01-01", "2018-03-31", 25.0, "10-Q", "Q1"),
+                duration_fact("2017-01-01", "2017-03-31", 22.0, "10-Q", "Q1"),
+            ],
+            "RevenueFromContract": [
+                duration_fact("2025-01-01", "2025-12-31", 250.0),
+            ],
+        },
+        ["Revenues", "RevenueFromContract"],
+    )
+
+    assert row["concept_name"] == "RevenueFromContract"
+    assert row["end"] == pd.Timestamp("2025-12-31")
+
+
+def test_ttm_combines_concepts_when_10k_and_10q_use_different_tags():
+    # Annual net income under NetIncomeLoss, quarterly only under ProfitLoss.
+    row = extract_ttm(
+        {
+            "NetIncomeLoss": [
+                duration_fact("2025-01-01", "2025-03-31", 148.2, "10-Q", "Q1"),
+                duration_fact("2025-01-01", "2025-12-31", 643.8),
+            ],
+            "ProfitLoss": [
+                duration_fact("2026-01-01", "2026-03-31", 138.1, "10-Q", "Q1"),
+            ],
+        },
+        ["NetIncomeLoss", "ProfitLoss"],
+    )
+
+    assert row["val"] == pytest.approx(643.8 + 138.1 - 148.2)
+    assert row["end"] == pd.Timestamp("2026-03-31")
+    assert row["concept_name"] == "NetIncomeLoss + ProfitLoss"

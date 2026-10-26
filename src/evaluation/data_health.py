@@ -40,7 +40,7 @@ def load_data_health_settings(config_path: str | Path) -> Dict[str, Any]:
         "duration_metrics": [
             metric
             for metric, period_type in metric_period_types.items()
-            if period_type == "duration_annual"
+            if period_type in ("duration_annual", "duration_ttm")
         ],
         "accounting_metrics": list(accounting_config.get("concepts", {}).keys()),
         "reference_metric": health_config.get("reference_metric", "net_income"),
@@ -186,12 +186,15 @@ def check_non_annual_durations(
 ) -> pd.DataFrame:
     """
     Flag metrics meant to be annual that fell back to another period length.
+    Trailing twelve month values cover a full year and count as annual.
     """
     if "duration_type" not in concepts.columns:
         return pd.DataFrame(columns=ISSUE_COLUMNS)
 
     duration = concepts[concepts["metric_name"].isin(duration_metrics)]
-    non_annual = duration[duration["duration_type"].astype(str) != "annual"]
+    non_annual = duration[
+        ~duration["duration_type"].astype(str).isin(["annual", "ttm"])
+    ]
 
     detail = (
         non_annual["metric_name"]
