@@ -190,6 +190,9 @@ sec_api:
   timeout_seconds: 30
   cache_enabled: true
   cache_dir: data/sec/cache
+  # Cached SEC responses older than this are refetched; if a refetch fails
+  # the old copy is used with a warning. Matches the weekly report cycle.
+  max_cache_age_days: 7
   reference_dir: data/sec/reference
 
 sec_reference:

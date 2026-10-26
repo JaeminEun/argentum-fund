@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict
@@ -8,7 +9,7 @@ from typing import Any, Dict
 import pandas as pd
 
 from src.sec.cik import load_company_tickers_reference, map_tickers_to_ciks
-from src.sec.client import SecClient
+from src.sec.client import SecClient, is_cache_fresh
 from src.universe.config import load_config
 
 
@@ -147,9 +148,12 @@ def fetch_companyfacts(
     Fetch SEC companyfacts JSON for a padded CIK.
 
     Uses a dedicated companyfacts cache folder so these files are easy
-    to inspect and reuse later.
+    to inspect and reuse later. Cached files older than the client's
+    max_cache_age_days are refetched.
     """
-    if not force_refresh:
+    cache_path = companyfacts_cache_path(facts_cache_dir, cik_padded)
+
+    if not force_refresh and is_cache_fresh(cache_path, client.max_cache_age_days):
         cached = load_cached_companyfacts(facts_cache_dir, cik_padded)
 
         if cached is not None:
@@ -171,6 +175,11 @@ def fetch_companyfacts(
         facts_cache_dir=facts_cache_dir,
         cik_padded=cik_padded,
     )
+
+    if client.last_response_from_cache:
+        # Keep the original download time so stale data stays visible.
+        source_mtime = client._cache_path_for_url(url).stat().st_mtime
+        os.utime(cache_path, (source_mtime, source_mtime))
 
     return facts
 
@@ -334,6 +343,12 @@ def build_sec_company_facts_summary(
                 ticker=ticker,
                 cik_padded=str(cik_padded),
             )
+
+            downloaded_at = datetime.fromtimestamp(
+                companyfacts_cache_path(facts_cache_dir, str(cik_padded)).stat().st_mtime,
+                tz=timezone.utc,
+            )
+            summary["retrieved_at_utc"] = downloaded_at.isoformat()
 
             summaries.append(summary)
 
