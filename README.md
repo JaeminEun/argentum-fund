@@ -571,6 +571,38 @@ python -m src.reports.weekly_report
 
 ---
 
+## Evaluating Model Changes
+
+The evaluation harness measures whether a change improves the model. Record a run before and after each change, then compare them:
+
+```bash
+python -m src.evaluation.run_evaluation run --label baseline
+# ...make a change and rerun the pipeline...
+python -m src.evaluation.run_evaluation run --label sec-concept-fix
+python -m src.evaluation.run_evaluation compare baseline sec-concept-fix
+```
+
+Each run is saved under `data/evaluation/runs/<label>/` with the git commit it came from, and contains:
+
+- **Output snapshots**: copies of the current price, fundamental, composite, and deployment outputs.
+- **Data health**: counts of stale SEC metrics, mismatched reporting periods, implausible ratios, stale prices, short price histories, and missing score inputs (`data_health_summary.csv`, with per-ticker details in `data_health_issues.csv`).
+- **Price score backtest**: the production price score recomputed on weekly dates using only data available at the time, compared with returns over the following 4, 13, and 26 weeks (`price_backtest_summary.csv`).
+
+Backtest measures:
+
+| Measure | Meaning |
+| --- | --- |
+| `mean_ic` | Average rank correlation between score and later return. Consistently above ~0.03 is meaningful. |
+| `ic_t_stat` | Confidence in `mean_ic`, using only non-overlapping dates. Above ~2 is unlikely to be chance. |
+| `mean_top_minus_weak` | Later return of `top_candidate` names minus `weak` names. |
+| `mean_top_hit_rate` | Share of `top_candidate` names that beat the equal-weighted universe. 0.5 is a coin flip. |
+
+Data from `holdout_start` (default 2025-01-01) onward is sealed. Tune designs on the earlier period, then check a settled design once with `--include-holdout`.
+
+Limitations: the universe is today's constituents, so delisted and removed companies are missing (survivorship bias). Compare models against each other on the same universe rather than reading absolute returns as achievable.
+
+---
+
 ## Viewing the Weekly Report
 
 After running the report module, open:

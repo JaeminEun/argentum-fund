@@ -495,3 +495,36 @@ security_master:
   path: data/reference/security_master.csv
   sec_ticker_reference_path: data/sec/reference/company_tickers.csv
   create_if_missing: true
+evaluation:
+  output_dir: data/evaluation/runs
+
+  price_backtest:
+    score_column: risk_adjusted_timing_score
+    bucket_column: score_bucket
+    rebalance_frequency: W-FRI
+    warmup_days: 252
+    min_names_per_date: 20
+    # Data from this date onward is held out and only evaluated with
+    # --include-holdout, once a design is settled.
+    holdout_start: "2025-01-01"
+    forward_horizons:
+      4w: 20
+      13w: 63
+      26w: 126
+
+  data_health:
+    reference_metric: net_income
+    max_metric_age_days: 548
+    period_mismatch_tolerance_days: 45
+    stale_price_days: 7
+    min_price_history_days: 252
+    implausible_ratio_bounds:
+      net_margin:
+        upper: 1.0
+      operating_margin:
+        upper: 1.0
+      fcf_margin:
+        upper: 1.0
+      return_on_equity:
+        lower: -3.0
+        upper: 3.0
