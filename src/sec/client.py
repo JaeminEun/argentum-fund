@@ -11,6 +11,31 @@ import requests
 
 from src.universe.config import load_config
 
+
+def cache_age_days(path: str | Path) -> float:
+    """
+    Age of a cached file in days, based on when it was last written.
+    """
+    return (time.time() - Path(path).stat().st_mtime) / 86400
+
+
+def is_cache_fresh(path: str | Path, max_age_days: float | None) -> bool:
+    """
+    True if the cached file exists and is within max_age_days.
+
+    max_age_days of None means cached files never expire.
+    """
+    path = Path(path)
+
+    if not path.exists():
+        return False
+
+    if max_age_days is None:
+        return True
+
+    return cache_age_days(path) <= max_age_days
+
+
 def resolve_user_agent(sec_config: Dict[str, Any]) -> str:
     """
     Resolve the SEC User-Agent from either a direct config value
@@ -50,7 +75,8 @@ class SecClient:
     - manage SEC request headers
     - respect request delay
     - retry failed requests
-    - optionally cache JSON responses
+    - optionally cache JSON responses, refetching entries older than
+      max_cache_age_days and falling back to them if a refetch fails
     """
 
     def __init__(
@@ -61,6 +87,7 @@ class SecClient:
         timeout_seconds: int = 30,
         cache_enabled: bool = True,
         cache_dir: str | Path = "data/sec/cache",
+        max_cache_age_days: float | None = None,
     ) -> None:
         if not user_agent or "contact:" not in user_agent.lower():
             raise ValueError(
@@ -74,6 +101,9 @@ class SecClient:
         self.timeout_seconds = timeout_seconds
         self.cache_enabled = cache_enabled
         self.cache_dir = Path(cache_dir)
+        self.max_cache_age_days = max_cache_age_days
+        # Whether the most recent get_json call was served from the cache.
+        self.last_response_from_cache = False
 
         self.headers = {
             "User-Agent": self.user_agent,
@@ -103,6 +133,11 @@ class SecClient:
             timeout_seconds=int(sec_config.get("timeout_seconds", 30)),
             cache_enabled=bool(sec_config.get("cache_enabled", True)),
             cache_dir=sec_config.get("cache_dir", "data/sec/cache"),
+            max_cache_age_days=(
+                float(sec_config["max_cache_age_days"])
+                if sec_config.get("max_cache_age_days") is not None
+                else None
+            ),
         )
 
     def _cache_path_for_url(self, url: str) -> Path:
@@ -126,7 +161,7 @@ class SecClient:
         url:
             URL to retrieve.
         force_refresh:
-            If True, ignore any cached copy.
+            If True, ignore any cached copy unless the request fails.
         host:
             Optional override for Host header. Useful because
             company_tickers.json is hosted on www.sec.gov while many
@@ -134,7 +169,14 @@ class SecClient:
         """
         cache_path = self._cache_path_for_url(url)
 
-        if self.cache_enabled and cache_path.exists() and not force_refresh:
+        has_cache = self.cache_enabled and cache_path.exists()
+
+        if (
+            has_cache
+            and not force_refresh
+            and is_cache_fresh(cache_path, self.max_cache_age_days)
+        ):
+            self.last_response_from_cache = True
             with cache_path.open("r", encoding="utf-8") as file:
                 return json.load(file)
 
@@ -162,6 +204,7 @@ class SecClient:
                 response.raise_for_status()
 
                 data = response.json()
+                self.last_response_from_cache = False
 
                 if self.cache_enabled:
                     cache_path.parent.mkdir(parents=True, exist_ok=True)
@@ -180,6 +223,15 @@ class SecClient:
                 )
                 print(f"Reason: {error}")
                 time.sleep(wait_seconds)
+
+        if has_cache:
+            print(
+                f"Warning: using cached copy ({cache_age_days(cache_path):.0f} days old) "
+                f"after failed refresh: {url}"
+            )
+            self.last_response_from_cache = True
+            with cache_path.open("r", encoding="utf-8") as file:
+                return json.load(file)
 
         raise RuntimeError(
             f"SEC request failed after {self.max_retries} attempts: {url}"
