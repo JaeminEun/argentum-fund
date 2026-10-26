@@ -5,6 +5,7 @@ import yaml
 
 from src.evaluation.data_health import (
     check_implausible_ratios,
+    check_missing_metrics,
     check_missing_score_inputs,
     check_period_mismatch,
     check_stale_metrics,
@@ -244,3 +245,17 @@ def test_backtest_runs_end_to_end_and_keeps_holdout_sealed(tmp_path):
     _, with_holdout = run_price_backtest(config_path, include_holdout=True)
 
     assert set(with_holdout["period"]) == {"in_sample", "holdout"}
+
+
+def test_missing_metrics_flagged_per_ticker():
+    concepts = pd.DataFrame(
+        {
+            "ticker": ["A", "A", "B"],
+            "metric_name": ["revenue", "capex", "revenue"],
+        }
+    )
+
+    issues = check_missing_metrics(concepts, ["revenue", "capex"])
+
+    assert issues[["ticker", "detail"]].values.tolist() == [["B", "capex missing"]]
+    assert set(issues["check"]) == {"missing_metric"}
